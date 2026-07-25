@@ -25,6 +25,11 @@ export interface Seed {
   createdAt: string;
   updatedAt: string;
   progress: number;
+  // Publishing is intentional and happens in the Seed Workspace, never
+  // automatically — the Grove only ever reads these two fields, it never
+  // sets them. See state/seedStore.ts's setSeedPublished.
+  isPublished: boolean;
+  publishedAt: string | null;
 }
 
 export interface SeedActivityItem {
@@ -43,6 +48,11 @@ export interface SeedEvidenceItem {
   description: string;
   createdAt: string;
   verified: boolean;
+  // Independent of the parent Seed's isPublished flag — publishing a Seed
+  // does not itself publish its evidence. Set only from the Seed
+  // Workspace's evidence panel, never inferred or defaulted to "public".
+  visibility: "private" | "public";
+  publishedAt: string | null;
 }
 
 export interface SeedConversationMessage {

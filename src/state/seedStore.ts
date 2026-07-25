@@ -173,6 +173,10 @@ function createSeedRecord(
     // No defined setup-completion rule exists yet, so a brand-new Seed
     // always starts at 0% — never inherited or estimated.
     progress: 0,
+    // Never published on creation — publishing is a deliberate, separate
+    // act from the Seed Workspace (see setSeedPublished below).
+    isPublished: false,
+    publishedAt: null,
   };
   data.seeds.push(seed);
   data.messages.push(welcomeMessageFor(seed));
@@ -225,6 +229,10 @@ export function addSeedEvidence(
     description: input.description,
     createdAt: new Date().toISOString(),
     verified: false,
+    // Private by default — the Grove never shows evidence the user hasn't
+    // deliberately made public (see setEvidenceVisibility below).
+    visibility: "private",
+    publishedAt: null,
   };
   data.evidence.push(item);
   save(userId, data);
@@ -248,4 +256,59 @@ export function addSeedActivity(
   data.activity.push(item);
   save(userId, data);
   return item;
+}
+
+// --- Publishing (Seed Workspace territory) -----------------------------
+// The Grove is a read-only presentation layer over these two flags — it
+// never sets them itself. These setters exist for the Seed Workspace /
+// evidence panel to call once that UI is built; nothing wires them up yet.
+
+export function setSeedPublished(
+  userId: string,
+  seedId: string,
+  isPublished: boolean,
+): Seed | null {
+  const data = load(userId);
+  const seed = data.seeds.find((item) => item.id === seedId);
+  if (!seed) return null;
+  const now = new Date().toISOString();
+  seed.isPublished = isPublished;
+  seed.publishedAt = isPublished ? now : null;
+  seed.updatedAt = now;
+  save(userId, data);
+  return seed;
+}
+
+export function setEvidenceVisibility(
+  userId: string,
+  evidenceId: string,
+  visibility: SeedEvidenceItem["visibility"],
+): SeedEvidenceItem | null {
+  const data = load(userId);
+  const item = data.evidence.find((evidence) => evidence.id === evidenceId);
+  if (!item) return null;
+  item.visibility = visibility;
+  item.publishedAt = visibility === "public" ? new Date().toISOString() : null;
+  save(userId, data);
+  return item;
+}
+
+// --- Grove reads ----------------------------------------------------------
+// Publishing a Seed does NOT publish its evidence — both getPublishedSeeds
+// and getPublicEvidenceForSeed must independently agree before anything
+// shows up on the Grove. This is the only place those two checks are
+// combined; the Grove page itself never inspects isPublished/visibility
+// directly.
+
+export function getPublishedSeeds(userId: string): Seed[] {
+  return listSeeds(userId).filter((seed) => seed.isPublished);
+}
+
+export function getPublicEvidenceForSeed(
+  userId: string,
+  seedId: string,
+): SeedEvidenceItem[] {
+  return getSeedEvidence(userId, seedId).filter(
+    (item) => item.visibility === "public",
+  );
 }

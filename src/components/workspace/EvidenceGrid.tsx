@@ -1,13 +1,22 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { ShieldCheck, Sparkles } from "lucide-react";
+import { ShieldCheck, Sparkles, Globe, Lock } from "lucide-react";
 import type { EvidenceItem } from "../../types/mockData";
+import type { SeedEvidenceItem } from "../../types/seed";
 
 interface EvidenceGridProps {
   evidence: EvidenceItem[];
+  // Both omitted for the demo Seed — its evidence lives in curated mock
+  // data, not the real store, so there's nothing for a toggle to persist.
+  visibilityById?: Record<string, SeedEvidenceItem["visibility"]>;
+  onToggleVisibility?: (evidenceId: string) => void;
 }
 
-export default function EvidenceGrid({ evidence }: EvidenceGridProps) {
+export default function EvidenceGrid({
+  evidence,
+  visibilityById,
+  onToggleVisibility,
+}: EvidenceGridProps) {
   const skills = useMemo(
     () => Array.from(new Set(evidence.map((item) => item.skill))),
     [evidence],
@@ -82,7 +91,33 @@ export default function EvidenceGrid({ evidence }: EvidenceGridProps) {
             <p className="mt-3 text-sm leading-relaxed text-ink">
               {item.summary}
             </p>
-            <p className="mt-3 text-xs text-ink-faint">{item.timestamp}</p>
+            <div className="mt-3 flex items-center justify-between">
+              <p className="text-xs text-ink-faint">{item.timestamp}</p>
+              {onToggleVisibility && (
+                <button
+                  type="button"
+                  onClick={() => onToggleVisibility(item.id)}
+                  className={[
+                    "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors",
+                    visibilityById?.[item.id] === "public"
+                      ? "border-accent-soft-border bg-accent-soft text-accent-dark"
+                      : "border-border text-ink-faint hover:border-ink-faint hover:text-ink-soft",
+                  ].join(" ")}
+                >
+                  {visibilityById?.[item.id] === "public" ? (
+                    <>
+                      <Globe className="h-3 w-3" strokeWidth={2} />
+                      Public
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="h-3 w-3" strokeWidth={2} />
+                      Private
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
           </motion.div>
         ))}
       </div>

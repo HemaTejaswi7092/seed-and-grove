@@ -18,6 +18,13 @@ import type {
   Highlight,
 } from "../types/mockData";
 import type { Seed, SeedConversationMessage } from "../types/seed";
+import type {
+  GroveProfileFields,
+  FeaturedSeedCard,
+  SkillSummary,
+  EvidenceHighlight,
+  GrowthTimelineEntry,
+} from "../types/grove";
 import { DEMO_SEED_ID } from "../config/demoAccount";
 
 // ---------------------------------------------------------------------------
@@ -38,6 +45,11 @@ export const DEMO_SEED: Seed = {
   createdAt: "2026-06-08T09:00:00.000Z",
   updatedAt: "2026-07-24T12:00:00.000Z",
   progress: 78,
+  // The demo account's Seed ships pre-published so the demo Grove has
+  // something to show — real Seeds always start unpublished (see
+  // state/seedStore.ts) and require the user to publish deliberately.
+  isPublished: true,
+  publishedAt: "2026-07-24T12:00:00.000Z",
 };
 
 export const previousProjects: PreviousProject[] = [
@@ -288,5 +300,113 @@ export const growthAreas: Highlight[] = [
     title: "Public speaking",
     description:
       "No evidence yet of presenting technical decisions to a non-technical audience.",
+  },
+];
+
+// ---------------------------------------------------------------------------
+// Demo Grove content — same isDemoAccount gating as everything above. The
+// authenticated display name is never sourced from here (see
+// lib/displayName.ts); this only supplies the extra fields real users would
+// otherwise fill in themselves via Edit Grove.
+// ---------------------------------------------------------------------------
+
+export const demoGroveProfileFields: GroveProfileFields = {
+  headline: "Software Engineer · AI Systems Builder",
+  bio: "I build practical AI systems focused on solving real-world problems — from real-time inference to the pipelines that keep it reliable under load.",
+  location: "Orlando, FL",
+  availability: "Open to full-time opportunities",
+  about: {
+    enjoys:
+      "Turning ambiguous, real-world signals into systems a machine can act on reliably.",
+    interests: "Computer vision, edge inference, developer tooling.",
+    direction:
+      "Looking to grow into a founding or staff-level ML systems role.",
+    technologies: "PyTorch, CUDA, Rust, TypeScript, Postgres.",
+  },
+  opportunities: {
+    openToOpportunities: true,
+    rolesOfInterest:
+      "Computer Vision Engineer, ML Platform Engineer, Founding Engineer",
+    workMode: "Remote / Hybrid",
+    collaborationInterests:
+      "Early-stage teams building real-time ML products.",
+    contactVisible: true,
+    contactEmail: "hema@seedandgrove.dev",
+  },
+};
+
+export const demoFeaturedSeeds: FeaturedSeedCard[] = [
+  {
+    id: DEMO_SEED_ID,
+    title: DEMO_SEED.title,
+    description: DEMO_SEED.description,
+    status: DEMO_SEED.status,
+    progress: DEMO_SEED.progress,
+    skills: Array.from(new Set(demoEvidenceFeed.map((item) => item.skill))),
+    evidenceCount: demoEvidenceFeed.length,
+  },
+];
+
+export const demoSkillSummaries: SkillSummary[] = Array.from(
+  demoEvidenceFeed
+    .reduce((map, item) => {
+      const existing = map.get(item.skill);
+      const supporting = { title: item.summary, seedTitle: DEMO_SEED.title };
+      if (existing) {
+        existing.evidenceCount += 1;
+        existing.supportingEvidence.push(supporting);
+      } else {
+        map.set(item.skill, {
+          skill: item.skill,
+          evidenceCount: 1,
+          supportingEvidence: [supporting],
+        });
+      }
+      return map;
+    }, new Map<string, SkillSummary>())
+    .values(),
+).sort((a, b) => b.evidenceCount - a.evidenceCount);
+
+export const demoEvidenceHighlights: EvidenceHighlight[] = demoEvidenceFeed.map(
+  (item) => ({
+    id: item.id,
+    title: item.summary,
+    description: item.summary,
+    seedTitle: DEMO_SEED.title,
+    seedId: DEMO_SEED_ID,
+    date: item.timestamp,
+    skill: item.skill,
+    visibility: "public",
+  }),
+);
+
+export const demoGrowthTimeline: GrowthTimelineEntry[] = [
+  {
+    id: "t-seed-published",
+    type: "seed_published",
+    title: 'Published "VISIQ" to the Grove',
+    date: "Jul 24, 2026",
+    sortKey: new Date("2026-07-24T12:00:00.000Z").getTime(),
+  },
+  {
+    id: "t-evidence-latency",
+    type: "evidence_published",
+    title: "Cut p99 inference latency 3.5x — VISIQ",
+    date: "Jul 24, 2026",
+    sortKey: new Date("2026-07-24T09:00:00.000Z").getTime(),
+  },
+  {
+    id: "t-skill-systems-design",
+    type: "skill_demonstrated",
+    title: "Demonstrated Systems Design",
+    date: "Jul 23, 2026",
+    sortKey: new Date("2026-07-23T09:00:00.000Z").getTime(),
+  },
+  {
+    id: "t-evidence-decoder",
+    type: "evidence_published",
+    title: "Traced and fixed a CUDA memory leak in the async decode path — VISIQ",
+    date: "Jul 24, 2026",
+    sortKey: new Date("2026-07-24T08:00:00.000Z").getTime(),
   },
 ];

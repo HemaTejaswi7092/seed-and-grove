@@ -24,6 +24,8 @@ import {
   getSeedMessages,
   getSeedActivity,
   getSeedEvidence,
+  setSeedPublished,
+  setEvidenceVisibility,
 } from "../state/seedStore";
 import { daysSince } from "../lib/dates";
 import { toDisplayEvidence } from "../lib/evidenceDisplay";
@@ -46,6 +48,10 @@ export default function Seed() {
   if (!seedId || !user) {
     return <Navigate to="/seeds" replace />;
   }
+  // Captured as its own const so TS narrows it as non-null inside the
+  // nested publish/visibility handlers below (closures aren't narrowed by
+  // the `if (!user)` guard above on their own).
+  const currentUser = user;
 
   const wantsDemoSeed = isDemoSeed(seedId);
   const isDemo = wantsDemoSeed && isDemoAccount(user.email);
@@ -58,6 +64,8 @@ export default function Seed() {
   if (!seed) {
     return <Navigate to="/seeds" replace />;
   }
+  // Same closure-narrowing reason as currentUser above.
+  const currentSeed = seed;
 
   const seeds = isDemo ? [DEMO_SEED] : listSeeds(user.id);
 
@@ -93,6 +101,25 @@ export default function Seed() {
     ? demoCopilotMessages
     : getSeedMessages(user.id, seed.id);
 
+  // Publishing state lives entirely here — the Grove only ever reads it
+  // (see state/seedStore.ts). Publishing a Seed does not publish its
+  // evidence; each evidence item's visibility is toggled independently.
+  const visibilityById: Record<string, SeedEvidenceItem["visibility"]> =
+    Object.fromEntries(rawEvidence.map((item) => [item.id, item.visibility]));
+
+  function handleTogglePublish() {
+    setSeedPublished(currentUser.id, currentSeed.id, !currentSeed.isPublished);
+    forceRefresh((n) => n + 1);
+  }
+
+  function handleToggleEvidenceVisibility(evidenceId: string) {
+    const current = rawEvidence.find((item) => item.id === evidenceId);
+    if (!current) return;
+    const next = current.visibility === "public" ? "private" : "public";
+    setEvidenceVisibility(currentUser.id, evidenceId, next);
+    forceRefresh((n) => n + 1);
+  }
+
   return (
     <div className="flex h-full bg-canvas">
       <WorkspaceSidebar
@@ -111,6 +138,7 @@ export default function Seed() {
           stats={stats}
           activeTab={activeTab}
           onTabChange={setActiveTab}
+          onTogglePublish={isDemo ? undefined : handleTogglePublish}
         />
 
         <div className="flex-1 overflow-y-auto">
@@ -145,7 +173,15 @@ export default function Seed() {
           {activeTab === "activity" && (
             <ActivityTimeline activityGroups={activityGroups} />
           )}
-          {activeTab === "evidence" && <EvidenceGrid evidence={evidence} />}
+          {activeTab === "evidence" && (
+            <EvidenceGrid
+              evidence={evidence}
+              visibilityById={isDemo ? undefined : visibilityById}
+              onToggleVisibility={
+                isDemo ? undefined : handleToggleEvidenceVisibility
+              }
+            />
+          )}
         </div>
       </div>
     </div>

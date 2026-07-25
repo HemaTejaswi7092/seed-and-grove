@@ -1,4 +1,4 @@
-import { Sparkles } from "lucide-react";
+import { Sparkles, Globe, Lock } from "lucide-react";
 import ProgressRing from "./ProgressRing";
 import { getInitials } from "../../lib/initials";
 import type { WorkspaceTab } from "./tabs";
@@ -16,6 +16,10 @@ interface ProjectHeaderProps {
   stats: ProjectStat[];
   activeTab: WorkspaceTab;
   onTabChange: (tab: WorkspaceTab) => void;
+  // The demo Seed ships pre-published and isn't backed by real storage, so
+  // it has nothing to toggle — omitting these two props hides the control
+  // entirely rather than rendering a toggle that can't do anything.
+  onTogglePublish?: () => void;
 }
 
 export default function ProjectHeader({
@@ -23,6 +27,7 @@ export default function ProjectHeader({
   stats,
   activeTab,
   onTabChange,
+  onTogglePublish,
 }: ProjectHeaderProps) {
   return (
     <div className="border-b border-border bg-canvas-elevated px-8 pt-8">
@@ -53,6 +58,30 @@ export default function ProjectHeader({
         </div>
 
         <div className="flex items-center gap-6">
+          {onTogglePublish && (
+            <button
+              type="button"
+              onClick={onTogglePublish}
+              className={[
+                "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                seed.isPublished
+                  ? "border-accent-soft-border bg-accent-soft text-accent-dark"
+                  : "border-border text-ink-soft hover:border-ink-faint hover:text-ink",
+              ].join(" ")}
+            >
+              {seed.isPublished ? (
+                <>
+                  <Globe className="h-3.5 w-3.5" strokeWidth={2} />
+                  Published to Grove
+                </>
+              ) : (
+                <>
+                  <Lock className="h-3.5 w-3.5" strokeWidth={2} />
+                  Private
+                </>
+              )}
+            </button>
+          )}
           <div className="flex gap-6">
             {stats.map((stat) => (
               <div key={stat.label}>
