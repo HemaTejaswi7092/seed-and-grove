@@ -1,5 +1,17 @@
 import { motion } from "framer-motion";
-import { MapPin, CircleDot, Eye, Share2, Pencil } from "lucide-react";
+import {
+  MapPin,
+  CircleDot,
+  Eye,
+  Share2,
+  Pencil,
+  Briefcase,
+  Mail,
+  FileText,
+  Link2,
+  Code2,
+  Globe,
+} from "lucide-react";
 
 interface ProfileStat {
   label: string;
@@ -9,11 +21,25 @@ interface ProfileStat {
 interface ProfileIdentityCardProps {
   displayName: string;
   initials: string;
+  avatarUrl?: string;
   headline: string;
   bio: string;
   location: string;
   availability: string;
   stats: ProfileStat[];
+  // Fast-scan "can I reach/hire this person" facts — deliberately kept to
+  // badges + a link row rather than paragraphs, so the hero stays a
+  // 5-second read (see the About block, rendered separately below this
+  // card, for the narrative version of "who this person is").
+  openToOpportunities: boolean;
+  workMode: string;
+  contactVisible: boolean;
+  contactEmail: string;
+  resumeUrl: string;
+  linkedinUrl: string;
+  githubUrl: string;
+  portfolioUrl: string;
+  websiteUrl: string;
   isOwner: boolean;
   isPreview: boolean;
   onTogglePreview: () => void;
@@ -24,17 +50,35 @@ interface ProfileIdentityCardProps {
 export default function ProfileIdentityCard({
   displayName,
   initials,
+  avatarUrl,
   headline,
   bio,
   location,
   availability,
   stats,
+  openToOpportunities,
+  workMode,
+  contactVisible,
+  contactEmail,
+  resumeUrl,
+  linkedinUrl,
+  githubUrl,
+  portfolioUrl,
+  websiteUrl,
   isOwner,
   isPreview,
   onTogglePreview,
   onShare,
   onEdit,
 }: ProfileIdentityCardProps) {
+  const links = [
+    { label: "Resume", href: resumeUrl, icon: FileText },
+    { label: "LinkedIn", href: linkedinUrl, icon: Link2 },
+    { label: "GitHub", href: githubUrl, icon: Code2 },
+    { label: "Portfolio", href: portfolioUrl, icon: Globe },
+    { label: "Website", href: websiteUrl, icon: Globe },
+  ].filter((link) => link.href.trim());
+  const showContactCta = contactVisible && contactEmail.trim();
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -44,9 +88,17 @@ export default function ProfileIdentityCard({
     >
       <div className="flex flex-col gap-8 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
-          <span className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-ink text-xl font-semibold text-white">
-            {initials}
-          </span>
+          {avatarUrl ? (
+            <img
+              src={avatarUrl}
+              alt=""
+              className="h-20 w-20 shrink-0 rounded-full border border-border object-cover"
+            />
+          ) : (
+            <span className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-ink text-xl font-semibold text-white">
+              {initials}
+            </span>
+          )}
           <div className="min-w-0">
             <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
               {displayName}
@@ -74,7 +126,44 @@ export default function ProfileIdentityCard({
                   {availability}
                 </span>
               )}
+              {openToOpportunities && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-accent-soft px-2.5 py-1 text-xs font-medium text-accent-dark">
+                  <Briefcase className="h-3.5 w-3.5" strokeWidth={2} />
+                  Open to opportunities
+                </span>
+              )}
+              {workMode && (
+                <span className="rounded-full border border-border px-2.5 py-1 text-xs font-medium text-ink-soft">
+                  {workMode}
+                </span>
+              )}
             </div>
+
+            {(links.length > 0 || showContactCta) && (
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                {showContactCta && (
+                  <a
+                    href={`mailto:${contactEmail}`}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-accent px-3 py-1.5 text-xs font-medium text-white shadow-sm shadow-accent/20 transition-colors hover:bg-accent-dark"
+                  >
+                    <Mail className="h-3.5 w-3.5" strokeWidth={2} />
+                    Email
+                  </a>
+                )}
+                {links.map((link) => (
+                  <a
+                    key={link.label}
+                    href={link.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-medium text-ink-soft transition-colors hover:border-ink-faint hover:text-ink"
+                  >
+                    <link.icon className="h-3.5 w-3.5" strokeWidth={2} />
+                    {link.label}
+                  </a>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import {
   Sparkles,
   Globe,
@@ -9,6 +9,8 @@ import {
   MoreHorizontal,
   Archive,
   ArchiveRestore,
+  Link2,
+  X,
 } from "lucide-react";
 import ProgressRing from "./ProgressRing";
 import { getInitials } from "../../lib/initials";
@@ -40,6 +42,11 @@ interface ProjectHeaderProps {
   onReopenProject?: () => void;
   onArchiveProject?: () => void;
   onUnarchiveProject?: () => void;
+  // Repo/demo URLs shown on the Grove Projects card — independent of
+  // publish state, so a candidate can fill these in before ever
+  // publishing. Omitted (like the other handlers) for the demo Seed,
+  // which isn't backed by real storage.
+  onSaveLinks?: (links: { repoUrl: string; demoUrl: string }) => Promise<void>;
 }
 
 export default function ProjectHeader({
@@ -53,8 +60,10 @@ export default function ProjectHeader({
   onReopenProject,
   onArchiveProject,
   onUnarchiveProject,
+  onSaveLinks,
 }: ProjectHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [linksModalOpen, setLinksModalOpen] = useState(false);
   const menuRef = useMenuDismissRef<HTMLDivElement>(menuOpen, () => setMenuOpen(false));
   const isArchived = seed.lifecycleStatus === "archived";
   const isCompleted = seed.lifecycleStatus === "completed";
@@ -95,6 +104,16 @@ export default function ProjectHeader({
               <Sparkles className="h-3.5 w-3.5" strokeWidth={2.25} />
               AI Copilot ready — using your Seed context
             </p>
+            {onSaveLinks && (
+              <button
+                type="button"
+                onClick={() => setLinksModalOpen(true)}
+                className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-ink-faint transition-colors hover:text-ink"
+              >
+                <Link2 className="h-3.5 w-3.5" strokeWidth={2} />
+                {seed.repoUrl || seed.demoUrl ? "Edit project links" : "Add repo/demo links"}
+              </button>
+            )}
           </div>
         </div>
 
@@ -230,6 +249,113 @@ export default function ProjectHeader({
             </button>
           );
         })}
+      </div>
+
+      {linksModalOpen && onSaveLinks && (
+        <ProjectLinksModal
+          repoUrl={seed.repoUrl}
+          demoUrl={seed.demoUrl}
+          onClose={() => setLinksModalOpen(false)}
+          onSave={async (links) => {
+            await onSaveLinks(links);
+            setLinksModalOpen(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function ProjectLinksModal({
+  repoUrl,
+  demoUrl,
+  onClose,
+  onSave,
+}: {
+  repoUrl: string;
+  demoUrl: string;
+  onClose: () => void;
+  onSave: (links: { repoUrl: string; demoUrl: string }) => Promise<void>;
+}) {
+  const [repo, setRepo] = useState(repoUrl);
+  const [demo, setDemo] = useState(demoUrl);
+  const [saving, setSaving] = useState(false);
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    if (saving) return;
+    setSaving(true);
+    try {
+      await onSave({ repoUrl: repo.trim(), demoUrl: demo.trim() });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/30 px-4 py-10 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        onClick={(event) => event.stopPropagation()}
+        className="w-full max-w-md rounded-2xl border border-border bg-canvas-elevated p-6 shadow-[0_24px_64px_-24px_rgba(26,28,25,0.4)]"
+      >
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-ink">Project links</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="flex h-7 w-7 items-center justify-center rounded-full text-ink-soft transition-colors hover:bg-accent-soft hover:text-ink"
+          >
+            <X className="h-4 w-4" strokeWidth={2} />
+          </button>
+        </div>
+        <p className="mt-1.5 text-xs leading-relaxed text-ink-faint">
+          Shown on this project's card in your Grove, whenever you fill them in.
+        </p>
+        <form onSubmit={handleSubmit} className="mt-4 space-y-3">
+          <label className="block">
+            <span className="text-xs font-medium tracking-wide text-ink-faint uppercase">
+              Repository
+            </span>
+            <input
+              className="mt-1.5 w-full rounded-lg border border-border bg-canvas px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none"
+              placeholder="https://github.com/you/project"
+              value={repo}
+              onChange={(e) => setRepo(e.target.value)}
+            />
+          </label>
+          <label className="block">
+            <span className="text-xs font-medium tracking-wide text-ink-faint uppercase">
+              Live demo
+            </span>
+            <input
+              className="mt-1.5 w-full rounded-lg border border-border bg-canvas px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none"
+              placeholder="https://your-demo.example.com"
+              value={demo}
+              onChange={(e) => setDemo(e.target.value)}
+            />
+          </label>
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={saving}
+              className="rounded-full border border-border px-4 py-2 text-xs font-medium text-ink-soft transition-colors hover:border-ink-faint hover:text-ink disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="rounded-full bg-accent px-4 py-2 text-xs font-medium text-white shadow-sm shadow-accent/20 transition-colors hover:bg-accent-dark disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {saving ? "Saving…" : "Save links"}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

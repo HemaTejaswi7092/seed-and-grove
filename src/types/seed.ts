@@ -46,6 +46,11 @@ export interface Seed {
   publishedAt: string | null;
   lifecycleStatus: LifecycleStatus;
   completedAt: string | null;
+  // Shown on the Grove Projects card when set — editable from the Seed
+  // Workspace, independent of publish state (a candidate can fill these
+  // in before ever publishing).
+  repoUrl: string;
+  demoUrl: string;
 }
 
 export interface SeedActivityItem {

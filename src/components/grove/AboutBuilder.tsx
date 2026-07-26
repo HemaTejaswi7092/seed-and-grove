@@ -20,7 +20,7 @@ export default function AboutBuilder({ about, isOwner, onEdit }: AboutBuilderPro
   return (
     <section>
       <h2 className="text-xs font-semibold tracking-wide text-ink-faint uppercase">
-        About the Builder
+        About
       </h2>
 
       {filled.length === 0 ? (

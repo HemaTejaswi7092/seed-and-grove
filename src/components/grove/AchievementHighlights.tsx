@@ -12,7 +12,7 @@ export default function AchievementHighlights({ achievements }: AchievementHighl
   return (
     <section>
       <h2 className="text-xs font-semibold tracking-wide text-ink-faint uppercase">
-        Achievements
+        Evidence &amp; Achievements
       </h2>
 
       {achievements.length === 0 ? (

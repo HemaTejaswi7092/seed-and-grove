@@ -1,9 +1,12 @@
-import type { Seed } from "../types/seed";
 import type { PublishedAchievement, SkillSummary } from "../types/grove";
 
 export interface PublishedAchievementWithSeed {
   achievement: PublishedAchievement;
-  seed: Seed;
+  // Only id/title are ever read here — kept minimal so this works for
+  // both the owner's own Grove (sourced from the full local Seed record)
+  // and a recruiter's view (sourced from the grove_seeds Postgres
+  // mirror, which never has the full private Seed shape).
+  seed: { id: string; title: string };
 }
 
 // Skills come only from published achievements' own skills_demonstrated

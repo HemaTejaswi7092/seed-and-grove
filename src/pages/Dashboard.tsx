@@ -5,7 +5,10 @@ import { getDisplayName } from "../lib/displayName";
 import { getInitials } from "../lib/initials";
 import { getCandidateProfile } from "../state/candidateProfileStore";
 import { getPublishedSeeds, listSeeds } from "../state/seedStore";
-import { listPublishedAchievements } from "../state/groveAchievementsStore";
+import {
+  listPublishedAchievements,
+  listExistingAchievementIds,
+} from "../state/groveAchievementsStore";
 import { deriveSkillsFromAchievements } from "../lib/groveSkills";
 import type { PublishedAchievementWithSeed } from "../lib/groveSkills";
 import {
@@ -24,6 +27,7 @@ import GroveSummaryCard from "../components/dashboard/GroveSummaryCard";
 import FeedSuggestionsPanel from "../components/dashboard/FeedSuggestionsPanel";
 import FeedEmptyState from "../components/dashboard/FeedEmptyState";
 import FeedPostCard from "../components/dashboard/FeedPostCard";
+import GlobalSearchBar from "../components/dashboard/GlobalSearchBar";
 import type { FeedPost } from "../types/feed";
 
 // Ranks the feed as: posts from people the viewer follows (most recent
@@ -57,6 +61,7 @@ export default function Dashboard() {
 
   const [posts, setPosts] = useState<FeedPost[] | null>(null);
   const [followingIds, setFollowingIds] = useState<Set<string>>(new Set());
+  const [validAchievementIds, setValidAchievementIds] = useState<Set<string>>(new Set());
   const [feedError, setFeedError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [ownAchievements, setOwnAchievements] = useState<
@@ -85,6 +90,30 @@ export default function Dashboard() {
     };
   }, [isDemo, user]);
 
+  // A feed post's evidence_id is a snapshot of what was published at
+  // share time — if the candidate later unpublished/deleted that
+  // Achievement, it's no longer a safe link target. FeedPostCard only
+  // links an Achievement title when its id shows up in this set (see
+  // groveAchievementsStore.ts's listExistingAchievementIds); anything
+  // else renders as plain text rather than a dead anchor.
+  useEffect(() => {
+    if (!posts) return;
+    let cancelled = false;
+    const ids = Array.from(
+      new Set(posts.map((post) => post.evidence_id).filter((id): id is string => !!id)),
+    );
+    listExistingAchievementIds(ids)
+      .then((valid) => {
+        if (!cancelled) setValidAchievementIds(valid);
+      })
+      .catch(() => {
+        if (!cancelled) setValidAchievementIds(new Set());
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [posts]);
+
   useEffect(() => {
     if (isDemo || !user) return;
     let cancelled = false;
@@ -96,7 +125,7 @@ export default function Dashboard() {
           rows
             .map((achievement) => {
               const seed = seedById.get(achievement.project_id);
-              return seed ? { achievement, seed } : null;
+              return seed ? { achievement, seed: { id: seed.id, title: seed.title } } : null;
             })
             .filter((item): item is PublishedAchievementWithSeed => item !== null),
         );
@@ -210,6 +239,10 @@ export default function Dashboard() {
 
       <div className="order-1 lg:order-2">
         <div className="mb-6">
+          <GlobalSearchBar />
+        </div>
+
+        <div className="mb-6">
           <h1 className="text-2xl font-semibold tracking-tight text-ink">
             Community Feed
           </h1>
@@ -242,6 +275,9 @@ export default function Dashboard() {
                       post={post}
                       isOwnPost={isOwnPost}
                       index={index}
+                      isAchievementLinkValid={
+                        !!post.evidence_id && validAchievementIds.has(post.evidence_id)
+                      }
                       isFollowing={
                         isDemo || isOwnPost
                           ? undefined

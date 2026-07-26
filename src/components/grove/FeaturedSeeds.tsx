@@ -1,18 +1,25 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Sprout, ArrowUpRight } from "lucide-react";
+import { Sprout, ArrowUpRight, Code2, ExternalLink } from "lucide-react";
 import { getInitials } from "../../lib/initials";
 import type { FeaturedSeedCard } from "../../types/grove";
 
 interface FeaturedSeedsProps {
   seeds: FeaturedSeedCard[];
+  // The Seed Workspace (/seeds/:id) is a private, authenticated route —
+  // only rendered as a link when this is the owner's own Grove. A
+  // recruiter viewing someone else's profile never gets that link at
+  // all, since it would 404 or hit an RLS wall for them.
+  isOwner: boolean;
 }
 
-export default function FeaturedSeeds({ seeds }: FeaturedSeedsProps) {
+export default function FeaturedSeeds({ seeds, isOwner }: FeaturedSeedsProps) {
+  if (seeds.length === 0 && !isOwner) return null;
+
   return (
     <section>
       <h2 className="text-xs font-semibold tracking-wide text-ink-faint uppercase">
-        Featured Seeds
+        Projects
       </h2>
 
       {seeds.length === 0 ? (
@@ -71,31 +78,83 @@ export default function FeaturedSeeds({ seeds }: FeaturedSeedsProps) {
                 {seed.description}
               </p>
 
-              {seed.skills.length > 0 && (
+              {seed.technologies.length > 0 && (
                 <div className="mt-4 flex flex-wrap gap-1.5">
-                  {seed.skills.map((skill) => (
+                  {seed.technologies.map((tech) => (
                     <span
-                      key={skill}
+                      key={tech}
                       className="rounded-full border border-border px-2.5 py-1 text-[11px] font-medium text-ink-soft"
                     >
-                      {skill}
+                      {tech}
                     </span>
                   ))}
                 </div>
               )}
 
+              {seed.relatedAchievements.length > 0 && (
+                <div className="mt-4">
+                  <p className="text-[11px] font-medium tracking-wide text-ink-faint uppercase">
+                    Related achievements
+                  </p>
+                  <ul className="mt-1.5 space-y-1">
+                    {seed.relatedAchievements.map((item) => (
+                      <li key={item.id} className="text-sm leading-snug">
+                        <a
+                          href={`#achievement-${item.id}`}
+                          className="text-accent-dark transition-colors hover:text-accent"
+                        >
+                          {item.title}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {(seed.repoUrl || seed.demoUrl) && (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {seed.repoUrl && (
+                    <a
+                      href={seed.repoUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-medium text-ink-soft transition-colors hover:border-ink-faint hover:text-ink"
+                    >
+                      <Code2 className="h-3.5 w-3.5" strokeWidth={2} />
+                      Repo
+                    </a>
+                  )}
+                  {seed.demoUrl && (
+                    <a
+                      href={seed.demoUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-medium text-ink-soft transition-colors hover:border-ink-faint hover:text-ink"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" strokeWidth={2} />
+                      Demo
+                    </a>
+                  )}
+                </div>
+              )}
+
               <div className="mt-5 flex items-center justify-between border-t border-border pt-4">
                 <div className="flex items-center gap-4 text-xs text-ink-faint">
-                  <span>{seed.achievementCount} achievements</span>
-                  <span>{seed.progress}% complete</span>
+                  <span>
+                    {seed.relatedAchievements.length}{" "}
+                    {seed.relatedAchievements.length === 1 ? "achievement" : "achievements"}
+                  </span>
+                  {seed.progress !== null && <span>{seed.progress}% complete</span>}
                 </div>
-                <Link
-                  to={`/seeds/${seed.id}`}
-                  className="inline-flex items-center gap-1 text-xs font-medium text-accent-dark transition-colors hover:text-accent"
-                >
-                  View Project
-                  <ArrowUpRight className="h-3.5 w-3.5" strokeWidth={2} />
-                </Link>
+                {isOwner && (
+                  <Link
+                    to={`/seeds/${seed.id}`}
+                    className="inline-flex items-center gap-1 text-xs font-medium text-accent-dark transition-colors hover:text-accent"
+                  >
+                    View Project
+                    <ArrowUpRight className="h-3.5 w-3.5" strokeWidth={2} />
+                  </Link>
+                )}
               </div>
             </motion.div>
           ))}

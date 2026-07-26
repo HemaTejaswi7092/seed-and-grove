@@ -23,7 +23,6 @@ import type {
   FeaturedSeedCard,
   SkillSummary,
   AchievementHighlight,
-  GrowthTimelineEntry,
 } from "../types/grove";
 import type { FeedPost } from "../types/feed";
 import { DEMO_SEED_ID } from "../config/demoAccount";
@@ -57,6 +56,8 @@ export const DEMO_SEED: Seed = {
   // that a Seed's stage never implies its lifecycle state.
   lifecycleStatus: "in_progress",
   completedAt: null,
+  repoUrl: "https://github.com/demo/visiq",
+  demoUrl: "",
 };
 
 export const previousProjects: PreviousProject[] = [
@@ -318,6 +319,7 @@ export const growthAreas: Highlight[] = [
 // ---------------------------------------------------------------------------
 
 export const demoGroveProfileFields: GroveProfileFields = {
+  avatarUrl: "",
   headline: "Software Engineer · AI Systems Builder",
   bio: "I build practical AI systems focused on solving real-world problems — from real-time inference to the pipelines that keep it reliable under load.",
   location: "Orlando, FL",
@@ -340,13 +342,43 @@ export const demoGroveProfileFields: GroveProfileFields = {
     contactVisible: true,
     contactEmail: "hema@seedandgrove.dev",
   },
-  education: "B.S. Computer Science, University of Central Florida",
-  experience: "ML Systems Intern, prior startup experience shipping real-time inference.",
+  education: [
+    {
+      id: "demo-edu-1",
+      institution: "University of Central Florida",
+      degree: "B.S.",
+      fieldOfStudy: "Computer Science",
+      startYear: "2019",
+      endYear: "2023",
+      description: "",
+    },
+  ],
+  experience: [
+    {
+      id: "demo-exp-1",
+      company: "A prior startup",
+      title: "ML Systems Intern",
+      location: "Remote",
+      startDate: "2022-05",
+      endDate: "2022-08",
+      currentlyWorking: false,
+      description: "Shipped real-time inference pipelines.",
+    },
+  ],
+  certifications: [],
+  professionalSkills: ["PyTorch", "Rust", "TypeScript", "Postgres"],
   workAuthorization: "U.S. Citizen",
+  requiresSponsorship: false,
+  preferredJobTypes: ["full_time"],
+  preferredLocations: ["Orlando, FL", "Remote"],
+  availabilityDate: "",
+  yearsOfExperience: "3-5 years",
   resumeUrl: "",
+  resumeVisible: false,
   linkedinUrl: "",
   githubUrl: "",
   portfolioUrl: "",
+  websiteUrl: "",
 };
 
 export const demoFeaturedSeeds: FeaturedSeedCard[] = [
@@ -357,8 +389,13 @@ export const demoFeaturedSeeds: FeaturedSeedCard[] = [
     status: DEMO_SEED.status,
     progress: DEMO_SEED.progress,
     lifecycleStatus: DEMO_SEED.lifecycleStatus,
-    skills: Array.from(new Set(demoEvidenceFeed.map((item) => item.skill))),
-    achievementCount: demoEvidenceFeed.length,
+    technologies: DEMO_SEED.technologies,
+    relatedAchievements: demoEvidenceFeed.map((item) => ({
+      id: item.id,
+      title: item.summary,
+    })),
+    repoUrl: DEMO_SEED.repoUrl || null,
+    demoUrl: DEMO_SEED.demoUrl || null,
   },
 ];
 
@@ -401,37 +438,6 @@ export const demoAchievementHighlights: AchievementHighlight[] = demoEvidenceFee
   }),
 );
 
-export const demoGrowthTimeline: GrowthTimelineEntry[] = [
-  {
-    id: "t-seed-published",
-    type: "seed_published",
-    title: 'Published "VISIQ" to the Grove',
-    date: "Jul 24, 2026",
-    sortKey: new Date("2026-07-24T12:00:00.000Z").getTime(),
-  },
-  {
-    id: "t-achievement-latency",
-    type: "achievement_published",
-    title: "Cut p99 inference latency 3.5x — VISIQ",
-    date: "Jul 24, 2026",
-    sortKey: new Date("2026-07-24T09:00:00.000Z").getTime(),
-  },
-  {
-    id: "t-skill-systems-design",
-    type: "skill_demonstrated",
-    title: "Demonstrated Systems Design",
-    date: "Jul 23, 2026",
-    sortKey: new Date("2026-07-23T09:00:00.000Z").getTime(),
-  },
-  {
-    id: "t-achievement-decoder",
-    type: "achievement_published",
-    title: "Traced and fixed a CUDA memory leak in the async decode path — VISIQ",
-    date: "Jul 24, 2026",
-    sortKey: new Date("2026-07-24T08:00:00.000Z").getTime(),
-  },
-];
-
 // ---------------------------------------------------------------------------
 // Demo Dashboard feed — same isDemoAccount gating as everything above, and
 // never written to the real feed_posts table (Dashboard.tsx renders this
@@ -452,6 +458,7 @@ export const demoFeedPosts: FeedPost[] = [
       "Cut inference latency 3.5x by redesigning the frame queue as a lock-free ring buffer.",
     author_name: "",
     project_title: "VISIQ",
+    achievement_title: null,
     evidence_summary:
       "Cut p99 inference latency 3.5x via a lock-free ring buffer redesign.",
     skills: ["Performance Engineering"],
@@ -469,6 +476,7 @@ export const demoFeedPosts: FeedPost[] = [
       "Finally traced that memory leak — turned out to be unreleased CUDA buffers in the async decode path.",
     author_name: "",
     project_title: "VISIQ",
+    achievement_title: null,
     evidence_summary:
       "Traced and fixed a CUDA memory leak in the async decode path.",
     skills: ["Debugging Under Pressure"],
@@ -486,6 +494,7 @@ export const demoFeedPosts: FeedPost[] = [
       "Chose edge deployment over cloud inference after modeling the latency and cost tradeoffs — written up as an ADR.",
     author_name: "",
     project_title: "VISIQ",
+    achievement_title: null,
     evidence_summary:
       "Chose edge deployment over cloud inference after modeling latency and cost tradeoffs.",
     skills: ["Systems Design", "Technical Writing"],
@@ -502,6 +511,7 @@ export const demoFeedPosts: FeedPost[] = [
     caption: "Started building VISIQ — real-time defect detection for manufacturing.",
     author_name: "",
     project_title: "VISIQ",
+    achievement_title: null,
     evidence_summary: null,
     skills: [],
     visibility: "public",

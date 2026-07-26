@@ -2,7 +2,7 @@
 // avatar initials) always comes from Supabase auth/profile — never from
 // here. These types cover the extra, Grove-specific fields the user fills
 // in themselves (see lib/groveProfile.ts) plus data derived from published
-// Seeds/achievements (see lib/groveSkills.ts, lib/groveTimeline.ts).
+// Seeds/achievements (see lib/groveSkills.ts).
 
 import type { LifecycleStatus } from "./seed";
 
@@ -22,25 +22,77 @@ export interface OpportunitiesInfo {
   contactEmail: string;
 }
 
+// Repeatable Settings entries (Professional Profile section) — stored as
+// jsonb arrays on candidate_profiles (see supabase/candidate_settings.sql);
+// `id` is a client-generated uuid used for React keys and edit/delete
+// targeting within the array, never a separate DB row of its own.
+export interface EducationEntry {
+  id: string;
+  institution: string;
+  degree: string;
+  fieldOfStudy: string;
+  startYear: string;
+  endYear: string;
+  description: string;
+}
+
+export interface ExperienceEntry {
+  id: string;
+  company: string;
+  title: string;
+  location: string;
+  startDate: string;
+  endDate: string;
+  currentlyWorking: boolean;
+  description: string;
+}
+
+export interface CertificationEntry {
+  id: string;
+  name: string;
+  issuingOrganization: string;
+  issueDate: string;
+  expirationDate: string;
+  credentialUrl: string;
+}
+
 // The candidate-editable form/draft shape — camelCase per this file's
 // convention for display/edit shapes. Backed by the candidate_profiles
-// Postgres table (see supabase/candidate_profiles.sql and
-// state/candidateProfileStore.ts), not localStorage — see that SQL
-// file's header comment for the migration this replaced.
+// Postgres table (see supabase/candidate_profiles.sql,
+// supabase/candidate_settings.sql, and state/candidateProfileStore.ts),
+// not localStorage — see candidate_profiles.sql's header comment for the
+// migration this replaced.
+//
+// professionalSkills is manually curated by the candidate for recruiter
+// readability ONLY — see CandidateSettings.tsx's header comment. It is
+// never read by the semantic matching engine (match-candidates /
+// match-jobs-for-candidate), which continues to rely solely on published
+// Achievements plus the interest/direction fields already in
+// `opportunities` above.
 export interface GroveProfileFields {
+  avatarUrl: string;
   headline: string;
   bio: string;
   location: string;
   availability: string;
   about: AboutBuilder;
   opportunities: OpportunitiesInfo;
-  education: string;
-  experience: string;
+  education: EducationEntry[];
+  experience: ExperienceEntry[];
+  certifications: CertificationEntry[];
+  professionalSkills: string[];
   workAuthorization: string;
+  requiresSponsorship: boolean;
+  preferredJobTypes: string[];
+  preferredLocations: string[];
+  availabilityDate: string;
+  yearsOfExperience: string;
   resumeUrl: string;
+  resumeVisible: boolean;
   linkedinUrl: string;
   githubUrl: string;
   portfolioUrl: string;
+  websiteUrl: string;
 }
 
 // Mirrors the candidate_profiles Postgres table verbatim (snake_case) —
@@ -50,6 +102,7 @@ export interface GroveProfileFields {
 export interface CandidateProfileRow {
   user_id: string;
   full_name: string;
+  avatar_url: string | null;
   headline: string;
   bio: string;
   location: string;
@@ -64,13 +117,22 @@ export interface CandidateProfileRow {
   collaboration_interests: string;
   contact_visible: boolean;
   contact_email: string;
-  education: string;
-  experience: string;
+  education: EducationEntry[];
+  experience: ExperienceEntry[];
+  certifications: CertificationEntry[];
+  professional_skills: string[];
   work_authorization: string;
+  requires_sponsorship: boolean;
+  preferred_job_types: string[];
+  preferred_locations: string[];
+  availability_date: string | null;
+  years_of_experience: string;
   resume_url: string | null;
+  resume_visible: boolean;
   linkedin_url: string | null;
   github_url: string | null;
   portfolio_url: string | null;
+  website_url: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -78,11 +140,13 @@ export interface CandidateProfileRow {
 // Mirrors the candidate_profiles_public VIEW verbatim — what recruiters
 // (and any other authenticated user) actually read. contact_email/
 // resume_url come back null here whenever the candidate hasn't opted
-// into contact_visible; that redaction happens in the view's own SQL,
-// not in this type or any component that reads it.
+// into contact_visible/resume_visible respectively; that redaction
+// happens in the view's own SQL, not in this type or any component that
+// reads it.
 export interface CandidateProfilePublic {
   user_id: string;
   full_name: string;
+  avatar_url: string | null;
   headline: string;
   bio: string;
   location: string;
@@ -97,13 +161,22 @@ export interface CandidateProfilePublic {
   collaboration_interests: string;
   contact_visible: boolean;
   contact_email: string | null;
-  education: string;
-  experience: string;
+  education: EducationEntry[];
+  experience: ExperienceEntry[];
+  certifications: CertificationEntry[];
+  professional_skills: string[];
   work_authorization: string;
+  requires_sponsorship: boolean;
+  preferred_job_types: string[];
+  preferred_locations: string[];
+  availability_date: string | null;
+  years_of_experience: string;
+  resume_visible: boolean;
   resume_url: string | null;
   linkedin_url: string | null;
   github_url: string | null;
   portfolio_url: string | null;
+  website_url: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -120,15 +193,25 @@ export interface GroveStrength {
   items: GroveStrengthItem[];
 }
 
+export interface RelatedAchievement {
+  id: string;
+  title: string;
+}
+
 export interface FeaturedSeedCard {
   id: string;
   title: string;
   description: string;
   status: string;
-  progress: number;
+  // Optional — the owner's own Grove (sourced from the local Seed record)
+  // always has this; a recruiter viewing a published Seed does not, since
+  // grove_seeds deliberately doesn't mirror the private progress field.
+  progress: number | null;
   lifecycleStatus: LifecycleStatus;
-  skills: string[];
-  achievementCount: number;
+  technologies: string[];
+  relatedAchievements: RelatedAchievement[];
+  repoUrl: string | null;
+  demoUrl: string | null;
 }
 
 export interface SkillSupportingAchievement {
@@ -188,16 +271,22 @@ export interface AchievementHighlight {
   date: string;
 }
 
-export type GrowthTimelineEntryType =
-  | "seed_published"
-  | "seed_completed"
-  | "achievement_published"
-  | "skill_demonstrated";
-
-export interface GrowthTimelineEntry {
+// Mirrors the grove_seeds Postgres table verbatim (snake_case, same
+// convention as PublishedAchievement above). Presence of a row here
+// already means "published" — see supabase/grove_seeds.sql's header
+// comment for why this table exists at all (Seeds otherwise live only in
+// the candidate's own localStorage, unreadable by anyone else).
+export interface PublishedSeed {
   id: string;
-  type: GrowthTimelineEntryType;
+  candidate_id: string;
   title: string;
-  date: string;
-  sortKey: number;
+  description: string;
+  technologies: string[];
+  status: string;
+  lifecycle_status: LifecycleStatus;
+  repo_url: string | null;
+  demo_url: string | null;
+  published_at: string;
+  created_at: string;
+  updated_at: string;
 }

@@ -62,6 +62,8 @@ function backfillSeed(seed: Seed): Seed {
     technologies: seed.technologies ?? [],
     lifecycleStatus: seed.lifecycleStatus ?? "in_progress",
     completedAt: seed.completedAt ?? null,
+    repoUrl: seed.repoUrl ?? "",
+    demoUrl: seed.demoUrl ?? "",
   };
 }
 
@@ -254,6 +256,8 @@ function createSeedRecord(
     publishedAt: null,
     lifecycleStatus: "in_progress",
     completedAt: null,
+    repoUrl: "",
+    demoUrl: "",
   };
   data.seeds.push(seed);
   data.messages.push(welcomeMessageFor(seed));
@@ -431,6 +435,21 @@ export function setSeedPublished(
 
 export function getPublishedSeeds(userId: string): Seed[] {
   return listSeeds(userId).filter((seed) => seed.isPublished);
+}
+
+export function updateSeedLinks(
+  userId: string,
+  seedId: string,
+  links: { repoUrl: string; demoUrl: string },
+): Seed | null {
+  const data = load(userId);
+  const seed = data.seeds.find((item) => item.id === seedId);
+  if (!seed) return null;
+  seed.repoUrl = links.repoUrl.trim();
+  seed.demoUrl = links.demoUrl.trim();
+  seed.updatedAt = new Date().toISOString();
+  save(userId, data);
+  return seed;
 }
 
 // --- Project lifecycle ------------------------------------------------

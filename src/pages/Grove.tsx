@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Sprout } from "lucide-react";
 import { useAuth } from "../auth/useAuth";
 import { isDemoAccount } from "../config/demoAccount";
@@ -20,14 +21,12 @@ import {
 import { calculateGroveStrength } from "../lib/groveStrength";
 import { deriveSkillsFromAchievements } from "../lib/groveSkills";
 import type { PublishedAchievementWithSeed } from "../lib/groveSkills";
-import { buildGrowthTimeline } from "../lib/groveTimeline";
 import { timeAgo } from "../lib/dates";
 import {
   demoGroveProfileFields,
   demoFeaturedSeeds,
   demoSkillSummaries,
   demoAchievementHighlights,
-  demoGrowthTimeline,
 } from "../data/mockData";
 import GroveView from "../components/grove/GroveView";
 import type {
@@ -45,9 +44,14 @@ import type {
 // of by the current session, and render with isOwner={false}.
 export default function Grove() {
   const { user, profile } = useAuth();
+  const navigate = useNavigate();
   const [previewMode, setPreviewMode] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+
+  function goToSettings() {
+    navigate("/settings");
+  }
 
   const isDemo = !!user && isDemoAccount(user.email);
 
@@ -165,7 +169,6 @@ export default function Grove() {
         featuredSeeds={demoFeaturedSeeds}
         skills={demoSkillSummaries}
         achievementHighlights={demoAchievementHighlights}
-        timeline={demoGrowthTimeline}
         isOwner
         isFreshGrove={false}
         isPreview={previewMode}
@@ -175,6 +178,7 @@ export default function Grove() {
         onOpenEdit={() => setEditOpen(true)}
         onCloseEdit={() => setEditOpen(false)}
         onSaveProfile={handleSaveProfile}
+        onEditProfessionalDetails={goToSettings}
         readOnlyProfile
         toast={toast}
       />
@@ -198,7 +202,7 @@ export default function Grove() {
   const achievementsWithSeed: PublishedAchievementWithSeed[] = publishedAchievements
     .map((achievement) => {
       const seed = seedById.get(achievement.project_id);
-      return seed ? { achievement, seed } : null;
+      return seed ? { achievement, seed: { id: seed.id, title: seed.title } } : null;
     })
     .filter((item): item is PublishedAchievementWithSeed => item !== null);
 
@@ -213,10 +217,13 @@ export default function Grove() {
       status: seed.status,
       progress: seed.progress,
       lifecycleStatus: seed.lifecycleStatus,
-      skills: Array.from(
-        new Set(seedAchievements.flatMap((item) => item.achievement.skills_demonstrated)),
-      ),
-      achievementCount: seedAchievements.length,
+      technologies: seed.technologies,
+      relatedAchievements: seedAchievements.map((item) => ({
+        id: item.achievement.id,
+        title: item.achievement.title,
+      })),
+      repoUrl: seed.repoUrl || null,
+      demoUrl: seed.demoUrl || null,
     };
   });
 
@@ -245,8 +252,6 @@ export default function Grove() {
       relevantRoles: achievement.relevant_roles,
       date: timeAgo(achievement.created_at),
     }));
-
-  const timeline = buildGrowthTimeline(publishedSeeds, achievementsWithSeed);
 
   const hasHeadlineOrBio = Boolean(
     profileFields.headline.trim() || profileFields.bio.trim(),
@@ -281,7 +286,6 @@ export default function Grove() {
       featuredSeeds={featuredSeeds}
       skills={skills}
       achievementHighlights={achievementHighlights}
-      timeline={timeline}
       isOwner
       isFreshGrove={isFreshGrove}
       isPreview={previewMode}
@@ -291,6 +295,7 @@ export default function Grove() {
       onOpenEdit={() => setEditOpen(true)}
       onCloseEdit={() => setEditOpen(false)}
       onSaveProfile={handleSaveProfile}
+      onEditProfessionalDetails={goToSettings}
       readOnlyProfile={false}
       toast={toast}
     />

@@ -32,12 +32,15 @@ import {
   getSeedMessages,
   getSeedActivity,
   getSeedAchievements,
-  setSeedPublished,
-  completeSeed,
-  reopenSeed,
-  archiveSeed,
-  unarchiveSeed,
 } from "../state/seedStore";
+import {
+  setSeedPublishedAndSync,
+  completeSeedAndSync,
+  reopenSeedAndSync,
+  archiveSeedAndSync,
+  unarchiveSeedAndSync,
+  updateSeedLinksAndSync,
+} from "../state/seedPublishing";
 import { updateAchievement, deleteAchievement } from "../state/achievements";
 import { createFeedPost } from "../state/feedStore";
 import { daysSince } from "../lib/dates";
@@ -57,6 +60,7 @@ interface ShareState {
   seedId: string;
   evidenceId: string | null;
   projectTitle: string;
+  achievementTitle: string | null;
   evidenceSummary: string | null;
   skills: string[];
   defaultCaption: string;
@@ -186,9 +190,23 @@ export default function Seed() {
     },
   ];
 
-  function handleTogglePublish() {
-    setSeedPublished(currentUser.id, currentSeed.id, !currentSeed.isPublished);
+  async function handleTogglePublish() {
+    const nextPublished = !currentSeed.isPublished;
+    try {
+      await setSeedPublishedAndSync(currentUser.id, currentSeed.id, nextPublished);
+      forceRefresh((n) => n + 1);
+      showToast(nextPublished ? "Published to Grove" : "Made private");
+    } catch (err) {
+      showToast(
+        err instanceof Error ? err.message : "Couldn't update this Seed's publish state.",
+      );
+    }
+  }
+
+  async function handleSaveProjectLinks(links: { repoUrl: string; demoUrl: string }) {
+    await updateSeedLinksAndSync(currentUser.id, currentSeed.id, links);
     forceRefresh((n) => n + 1);
+    showToast("Project links saved");
   }
 
   function showToast(message: string) {
@@ -231,26 +249,26 @@ export default function Seed() {
   }
 
   async function handleConfirmComplete() {
-    completeSeed(currentUser.id, currentSeed.id);
+    await completeSeedAndSync(currentUser.id, currentSeed.id);
     setCompleteModalOpen(false);
     forceRefresh((n) => n + 1);
     showToast("Project marked complete");
   }
 
-  function handleReopenProject() {
-    reopenSeed(currentUser.id, currentSeed.id);
+  async function handleReopenProject() {
+    await reopenSeedAndSync(currentUser.id, currentSeed.id);
     forceRefresh((n) => n + 1);
     showToast("Project reopened");
   }
 
-  function handleArchiveProject() {
-    archiveSeed(currentUser.id, currentSeed.id);
+  async function handleArchiveProject() {
+    await archiveSeedAndSync(currentUser.id, currentSeed.id);
     forceRefresh((n) => n + 1);
     showToast("Project archived");
   }
 
-  function handleUnarchiveProject() {
-    unarchiveSeed(currentUser.id, currentSeed.id);
+  async function handleUnarchiveProject() {
+    await unarchiveSeedAndSync(currentUser.id, currentSeed.id);
     forceRefresh((n) => n + 1);
     showToast("Project unarchived");
   }
@@ -265,6 +283,7 @@ export default function Seed() {
       seedId: currentSeed.id,
       evidenceId: item.id,
       projectTitle: currentSeed.title,
+      achievementTitle: item.title,
       evidenceSummary: item.shortDescription,
       skills: item.skillsDemonstrated,
       defaultCaption: `Made progress on "${currentSeed.title}": ${item.title}`,
@@ -279,6 +298,7 @@ export default function Seed() {
       seedId: currentSeed.id,
       evidenceId: null,
       projectTitle: currentSeed.title,
+      achievementTitle: null,
       evidenceSummary: null,
       skills: [],
       defaultCaption: `Published "${currentSeed.title}" to my Grove.`,
@@ -297,6 +317,7 @@ export default function Seed() {
       caption: input.caption,
       author_name: getDisplayName(currentUser, profile) || "A builder",
       project_title: shareState.projectTitle,
+      achievement_title: shareState.achievementTitle,
       evidence_summary: shareState.evidenceSummary,
       skills: shareState.skills,
       visibility: input.visibility,
@@ -329,6 +350,7 @@ export default function Seed() {
           onReopenProject={isDemo ? undefined : handleReopenProject}
           onArchiveProject={isDemo ? undefined : handleArchiveProject}
           onUnarchiveProject={isDemo ? undefined : handleUnarchiveProject}
+          onSaveLinks={isDemo ? undefined : handleSaveProjectLinks}
         />
 
         <div className="flex-1 overflow-y-auto">

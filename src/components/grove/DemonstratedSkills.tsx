@@ -9,7 +9,7 @@ export default function DemonstratedSkills({ skills }: DemonstratedSkillsProps) 
   return (
     <section>
       <h2 className="text-xs font-semibold tracking-wide text-ink-faint uppercase">
-        Demonstrated Skills
+        Skills
       </h2>
 
       {skills.length === 0 ? (
