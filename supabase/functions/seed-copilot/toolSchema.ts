@@ -54,7 +54,7 @@ export const COPILOT_RESPONSE_SCHEMA = {
     evidenceCandidate: {
       type: "object",
       description:
-        "Only include this if the user reported specific, verifiable completed work (an implementation, a fix, a measurable improvement) — never for questions or stated plans/intentions. This pre-fills a review form the candidate always edits and approves before anything is saved, so it's fine to be a best-effort guess rather than certain.",
+        "Only include this if the message reports meaningful completed work that clearly demonstrates the candidate's OWN contribution: something built/completed, an implemented technical decision, a measurable result or improvement, a solved problem, a completed project milestone, or a produced artifact (dashboard, model, deployment, document, certification, presentation, research result, award). A strong candidate usually has at least two of: the action/contribution, the method or technology, a completed output, a measurable result, or supporting proof. Do NOT include this for a question, a request for guidance, a future plan or intention, an unresolved error, a generic learning statement, a vague progress claim, casual conversation, or work primarily done by someone else. Do NOT include this if it duplicates or nearly duplicates an item already in \"Logged evidence\" below — if your own reply text acknowledges the work is already logged, this field must agree and stay empty. This pre-fills a review form the candidate always edits and approves before anything is saved — never auto-published — so it's fine to be a best-effort guess rather than certain about WHETHER to include it. Once you do include it, though, every field below must be extracted conservatively — never a best-effort guess at facts the message doesn't state.",
       properties: {
         title: { type: "string" },
         summary: { type: "string" },
@@ -68,7 +68,8 @@ export const COPILOT_RESPONSE_SCHEMA = {
         technologiesUsed: {
           type: "array",
           items: { type: "string" },
-          description: "Specific technologies/tools/libraries used, e.g. [\"PostgreSQL\", \"Power BI\"]. Omit if unclear.",
+          description:
+            "Specific technologies/tools/libraries used, e.g. [\"PostgreSQL\", \"Power BI\"]. Only technologies the message explicitly names — never infer or add one you'd merely expect them to have used (e.g. don't add a database engine, language, or framework the candidate didn't mention). Omit entirely if none were named.",
         },
         projectDomain: {
           type: "string",
@@ -81,11 +82,13 @@ export const COPILOT_RESPONSE_SCHEMA = {
         },
         candidateContribution: {
           type: "string",
-          description: "What specifically the candidate did, in their own words from the message — not a generic restatement.",
+          description:
+            "What specifically the candidate did, in their own words from the message — not a generic restatement. Always populate this whenever the message states what they personally did, even a single first-person clause (e.g. \"I decided to...\", \"I deployed...\", \"I fixed...\") — do not leave it empty just because the sentence is short.",
         },
         outcomeOrImpact: {
           type: "string",
-          description: "The measurable or observed result, if the message states one.",
+          description:
+            "The measurable or observed result, ONLY if the message states one — quote it as given. If the candidate gave specific numbers (e.g. \"800ms to 120ms\", \"4 hours to 30 minutes\", \"15%\"), preserve those exact figures; never collapse them into a computed difference or a different number. Never infer or add an impact/benefit the candidate didn't claim (e.g. don't add \"improved reliability\" or \"reduced risk\" unless they said so) — omit this field entirely rather than guess at an outcome.",
         },
       },
       required: ["title", "summary", "category", "confidence"],

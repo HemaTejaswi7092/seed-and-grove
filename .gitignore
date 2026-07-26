@@ -25,3 +25,6 @@ dist-ssr
 
 # Supabase CLI local state
 supabase/.temp/
+
+# Point-in-time output from scripts/verify-achievement-detection.sh
+verification-results/
