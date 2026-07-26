@@ -1,9 +1,11 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { MailCheck, Sprout } from "lucide-react";
+import { MailCheck } from "lucide-react";
 import { useAuth } from "../auth/useAuth";
 import { getAuthErrorMessage } from "../auth/authErrors";
+import AuthHeader from "../components/auth/AuthHeader";
+import RoleSwitchLink from "../components/auth/RoleSwitchLink";
 
 const inputClasses =
   "w-full rounded-lg border border-border bg-canvas px-3.5 py-2.5 text-sm text-ink placeholder:text-ink-faint transition-colors focus:border-accent focus:outline-none";
@@ -54,16 +56,7 @@ export default function SignUp() {
 
   return (
     <div className="flex min-h-screen flex-col bg-canvas">
-      <header className="flex items-center px-6 py-6">
-        <Link to="/" className="flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-soft text-accent">
-            <Sprout className="h-4 w-4" strokeWidth={2.25} />
-          </span>
-          <span className="text-[15px] font-semibold tracking-tight text-ink">
-            Seed &amp; Grove
-          </span>
-        </Link>
-      </header>
+      <AuthHeader />
 
       <main className="flex flex-1 justify-center px-6 py-8">
         <motion.div
@@ -232,6 +225,12 @@ export default function SignUp() {
                   Sign In
                 </Link>
               </p>
+
+              <RoleSwitchLink
+                prompt="Looking for a recruiter account?"
+                linkLabel="Recruiter Sign Up"
+                to="/recruiter/signup"
+              />
             </>
           )}
         </motion.div>

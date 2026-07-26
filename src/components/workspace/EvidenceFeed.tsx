@@ -14,8 +14,8 @@ export default function EvidenceFeed({ evidence, onViewAll }: EvidenceFeedProps)
     <div className="flex h-[560px] flex-col overflow-hidden rounded-2xl border border-border bg-canvas-elevated">
       <div className="flex items-center justify-between border-b border-border px-5 py-4">
         <div>
-          <p className="text-sm font-semibold text-ink">Live Evidence</p>
-          <p className="text-xs text-ink-faint">Generated as you build</p>
+          <p className="text-sm font-semibold text-ink">Recent Achievements</p>
+          <p className="text-xs text-ink-faint">Saved as you build</p>
         </div>
         <button
           type="button"
@@ -33,8 +33,8 @@ export default function EvidenceFeed({ evidence, onViewAll }: EvidenceFeedProps)
             <Sparkles className="h-5 w-5" strokeWidth={2} />
           </span>
           <p className="max-w-xs text-sm leading-relaxed text-ink-soft">
-            No evidence has been captured yet. Evidence will appear here as
-            you build and record your progress.
+            No achievements yet. They&apos;ll appear here as you build and
+            save them from the Copilot.
           </p>
         </div>
       ) : (

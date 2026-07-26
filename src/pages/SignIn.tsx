@@ -1,21 +1,35 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Sprout } from "lucide-react";
 import { useAuth } from "../auth/useAuth";
 import { getAuthErrorMessage } from "../auth/authErrors";
+import { resolvePostLoginPath } from "../auth/postLoginRedirect";
+import AuthHeader from "../components/auth/AuthHeader";
+import RoleSwitchLink from "../components/auth/RoleSwitchLink";
 
 const inputClasses =
   "w-full rounded-lg border border-border bg-canvas px-3.5 py-2.5 text-sm text-ink placeholder:text-ink-faint transition-colors focus:border-accent focus:outline-none";
 
-export default function SignIn() {
+interface SignInProps {
+  accountType?: "candidate" | "recruiter";
+}
+
+// One shared sign-in form for both account types — Supabase auth doesn't
+// need to know which flow the user picked, since resolvePostLoginPath
+// routes off the profile's real account_type after login regardless of
+// which page they signed in from. accountType here only drives copy and
+// the role-switch link, so candidates and recruiters never feel stuck in
+// the wrong page without duplicating the form.
+export default function SignIn({ accountType = "candidate" }: SignInProps) {
   const navigate = useNavigate();
-  const { signInWithEmail, signInWithGoogle, signInWithGitHub } = useAuth();
+  const { signInWithEmail, signInWithGoogle, signInWithGitHub, resetPasswordForEmail } =
+    useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [resetStatus, setResetStatus] = useState<"idle" | "sending" | "sent">("idle");
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -23,11 +37,24 @@ export default function SignIn() {
     setSubmitting(true);
     try {
       const { profile } = await signInWithEmail(email, password);
-      navigate(profile?.onboarding_completed ? "/dashboard" : "/onboarding");
+      navigate(await resolvePostLoginPath(profile));
     } catch (err) {
       setError(getAuthErrorMessage(err));
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleForgotPassword() {
+    if (!email.trim() || resetStatus === "sending") return;
+    setError("");
+    setResetStatus("sending");
+    try {
+      await resetPasswordForEmail(email.trim());
+      setResetStatus("sent");
+    } catch (err) {
+      setResetStatus("idle");
+      setError(getAuthErrorMessage(err));
     }
   }
 
@@ -42,16 +69,7 @@ export default function SignIn() {
 
   return (
     <div className="flex min-h-screen flex-col bg-canvas">
-      <header className="flex items-center px-6 py-6">
-        <Link to="/" className="flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-soft text-accent">
-            <Sprout className="h-4 w-4" strokeWidth={2.25} />
-          </span>
-          <span className="text-[15px] font-semibold tracking-tight text-ink">
-            Seed &amp; Grove
-          </span>
-        </Link>
-      </header>
+      <AuthHeader variant={accountType === "recruiter" ? "recruiter" : undefined} />
 
       <main className="flex flex-1 justify-center px-6 py-8">
         <motion.div
@@ -122,11 +140,19 @@ export default function SignIn() {
                 </label>
                 <button
                   type="button"
-                  className="text-sm font-medium text-ink-soft transition-colors hover:text-ink"
+                  onClick={handleForgotPassword}
+                  disabled={!email.trim() || resetStatus === "sending"}
+                  className="text-sm font-medium text-ink-soft transition-colors hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Forgot password?
+                  {resetStatus === "sending" ? "Sending…" : "Forgot password?"}
                 </button>
               </div>
+
+              {resetStatus === "sent" && (
+                <p className="rounded-lg bg-accent-soft px-3 py-2 text-sm text-accent-dark">
+                  Check {email} for a link to reset your password.
+                </p>
+              )}
 
               {error && (
                 <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
@@ -170,12 +196,22 @@ export default function SignIn() {
           <p className="mt-6 text-center text-sm text-ink-soft">
             New user?{" "}
             <Link
-              to="/signup"
+              to={accountType === "recruiter" ? "/recruiter/signup" : "/signup"}
               className="font-medium text-accent-dark hover:text-accent"
             >
               Sign up
             </Link>
           </p>
+
+          <RoleSwitchLink
+            prompt={
+              accountType === "recruiter"
+                ? "Looking for a candidate account?"
+                : "Looking for a recruiter account?"
+            }
+            linkLabel={accountType === "recruiter" ? "Candidate Login" : "Recruiter Login"}
+            to={accountType === "recruiter" ? "/signin" : "/recruiter/signin"}
+          />
         </motion.div>
       </main>
     </div>

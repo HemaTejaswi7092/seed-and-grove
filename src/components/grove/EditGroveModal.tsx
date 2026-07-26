@@ -6,7 +6,10 @@ import type { GroveProfileFields } from "../../types/grove";
 interface EditGroveModalProps {
   fields: GroveProfileFields;
   onClose: () => void;
-  onSave: (next: GroveProfileFields) => void;
+  // Throw to signal failure — caught below, shown inline, and the modal
+  // stays open so a failed save never reads as a silent success (the
+  // caller only unmounts this modal once onSave resolves).
+  onSave: (next: GroveProfileFields) => Promise<void>;
 }
 
 function Field({
@@ -38,10 +41,20 @@ export default function EditGroveModal({
   // initial value is always fresh — no cancelled draft can leak into the
   // next open because there is no "next open" of the same instance.
   const [draft, setDraft] = useState(fields);
+  const [status, setStatus] = useState<"idle" | "saving" | "error">("idle");
+  const [errorText, setErrorText] = useState<string | null>(null);
 
-  function handleSubmit(event: FormEvent) {
+  async function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    onSave(draft);
+    if (status === "saving") return;
+    setStatus("saving");
+    setErrorText(null);
+    try {
+      await onSave(draft);
+    } catch (err) {
+      setStatus("error");
+      setErrorText(err instanceof Error ? err.message : "Couldn't save your Grove.");
+    }
   }
 
   return (
@@ -284,21 +297,116 @@ export default function EditGroveModal({
                   />
                 </Field>
               )}
+              <p className="text-xs leading-relaxed text-ink-faint">
+                Only shown to recruiters when &quot;Show a contact button&quot; is
+                checked — this also controls whether your resume link below is
+                visible to anyone but you.
+              </p>
             </div>
+
+            <div className="space-y-4 border-t border-border pt-6">
+              <p className="text-xs font-semibold tracking-wide text-accent-dark uppercase">
+                Professional Details
+              </p>
+              <Field label="Education">
+                <textarea
+                  className={inputClass}
+                  rows={2}
+                  placeholder="e.g. B.S. Computer Science, University of Florida"
+                  value={draft.education}
+                  onChange={(e) => setDraft({ ...draft, education: e.target.value })}
+                />
+              </Field>
+              <Field label="Experience">
+                <textarea
+                  className={inputClass}
+                  rows={2}
+                  placeholder="e.g. Software Engineer Intern, Acme Co. (Summer 2025)"
+                  value={draft.experience}
+                  onChange={(e) => setDraft({ ...draft, experience: e.target.value })}
+                />
+              </Field>
+              <Field label="Work authorization">
+                <input
+                  className={inputClass}
+                  placeholder="e.g. U.S. Citizen, requires sponsorship, etc."
+                  value={draft.workAuthorization}
+                  onChange={(e) =>
+                    setDraft({ ...draft, workAuthorization: e.target.value })
+                  }
+                />
+              </Field>
+            </div>
+
+            <div className="space-y-4 border-t border-border pt-6">
+              <p className="text-xs font-semibold tracking-wide text-accent-dark uppercase">
+                Links
+              </p>
+              <Field label="Resume link">
+                <input
+                  className={inputClass}
+                  type="url"
+                  placeholder="https://drive.google.com/..."
+                  value={draft.resumeUrl}
+                  onChange={(e) => setDraft({ ...draft, resumeUrl: e.target.value })}
+                />
+              </Field>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <Field label="LinkedIn">
+                  <input
+                    className={inputClass}
+                    type="url"
+                    placeholder="https://linkedin.com/in/..."
+                    value={draft.linkedinUrl}
+                    onChange={(e) =>
+                      setDraft({ ...draft, linkedinUrl: e.target.value })
+                    }
+                  />
+                </Field>
+                <Field label="GitHub">
+                  <input
+                    className={inputClass}
+                    type="url"
+                    placeholder="https://github.com/..."
+                    value={draft.githubUrl}
+                    onChange={(e) => setDraft({ ...draft, githubUrl: e.target.value })}
+                  />
+                </Field>
+                <Field label="Portfolio">
+                  <input
+                    className={inputClass}
+                    type="url"
+                    placeholder="https://..."
+                    value={draft.portfolioUrl}
+                    onChange={(e) =>
+                      setDraft({ ...draft, portfolioUrl: e.target.value })
+                    }
+                  />
+                </Field>
+              </div>
+            </div>
+
+            {status === "error" && errorText && (
+              <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+                {errorText}
+              </p>
+            )}
 
             <div className="flex items-center justify-end gap-3 border-t border-border pt-6">
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-full border border-border px-5 py-2.5 text-sm font-medium text-ink-soft transition-colors hover:border-ink-faint hover:text-ink"
+                disabled={status === "saving"}
+                className="rounded-full border border-border px-5 py-2.5 text-sm font-medium text-ink-soft transition-colors hover:border-ink-faint hover:text-ink disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="rounded-full bg-accent px-5 py-2.5 text-sm font-medium text-white shadow-sm shadow-accent/20 transition-colors hover:bg-accent-dark"
+                disabled={status === "saving"}
+                className="rounded-full bg-accent px-5 py-2.5 text-sm font-medium text-white shadow-sm shadow-accent/20 transition-colors hover:bg-accent-dark disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Save Grove
+                {status === "saving" ? "Saving…" : "Save Grove"}
               </button>
             </div>
           </form>

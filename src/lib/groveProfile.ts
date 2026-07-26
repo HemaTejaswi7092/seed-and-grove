@@ -1,17 +1,12 @@
 import type { GroveProfileFields } from "../types/grove";
 
 /**
- * TEMPORARY PERSISTENCE — Grove's own profile fields (headline, bio,
- * location, availability, About the Builder, Opportunities) don't have
- * columns on Supabase's `profiles` table yet (see supabase/setup.sql,
- * which only has full_name/onboarding_completed). This shape is written to
- * mirror what those columns will look like, so migrating later is a matter
- * of swapping this module's load/save bodies for `supabase.from("profiles")`
- * calls — nothing that reads GroveProfileFields needs to change.
- *
- * Keyed per authenticated userId in localStorage, same isolation pattern as
- * state/seedStore.ts. Real identity (name, email) is never stored here —
- * it always comes from useAuth().
+ * Grove's own profile fields now live in Postgres — see
+ * supabase/candidate_profiles.sql and state/candidateProfileStore.ts.
+ * What's left in this file is only the legacy localStorage reader, kept
+ * so Grove.tsx can migrate a candidate's pre-existing local draft into
+ * Postgres the first time they load Grove after this migration — it's
+ * read once and never written to again.
  */
 
 export const EMPTY_GROVE_PROFILE_FIELDS: GroveProfileFields = {
@@ -33,16 +28,27 @@ export const EMPTY_GROVE_PROFILE_FIELDS: GroveProfileFields = {
     contactVisible: false,
     contactEmail: "",
   },
+  education: "",
+  experience: "",
+  workAuthorization: "",
+  resumeUrl: "",
+  linkedinUrl: "",
+  githubUrl: "",
+  portfolioUrl: "",
 };
 
-function storageKey(userId: string): string {
+function legacyStorageKey(userId: string): string {
   return `seedAndGroveProfileFields:${userId}`;
 }
 
-export function loadGroveProfileFields(userId: string): GroveProfileFields {
+// Returns null if there's nothing to migrate (never saved locally, or
+// already migrated — see clearLegacyGroveProfileFields).
+export function loadLegacyGroveProfileFields(
+  userId: string,
+): GroveProfileFields | null {
   try {
-    const raw = localStorage.getItem(storageKey(userId));
-    if (!raw) return { ...EMPTY_GROVE_PROFILE_FIELDS };
+    const raw = localStorage.getItem(legacyStorageKey(userId));
+    if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<GroveProfileFields>;
     return {
       ...EMPTY_GROVE_PROFILE_FIELDS,
@@ -54,17 +60,39 @@ export function loadGroveProfileFields(userId: string): GroveProfileFields {
       },
     };
   } catch {
-    return { ...EMPTY_GROVE_PROFILE_FIELDS };
+    return null;
   }
 }
 
-export function saveGroveProfileFields(
-  userId: string,
-  fields: GroveProfileFields,
-): void {
+// Called once the legacy draft has been upserted into Postgres, so the
+// migration never re-runs (and never overwrites a later Postgres edit
+// with a stale local copy) on a subsequent Grove load.
+export function clearLegacyGroveProfileFields(userId: string): void {
   try {
-    localStorage.setItem(storageKey(userId), JSON.stringify(fields));
+    localStorage.removeItem(legacyStorageKey(userId));
   } catch {
-    // localStorage unavailable — edits just won't persist across reloads.
+    // localStorage unavailable — harmless, there's nothing to clear.
   }
+}
+
+export function isGroveProfileFieldsEmpty(fields: GroveProfileFields): boolean {
+  return !(
+    fields.headline.trim() ||
+    fields.bio.trim() ||
+    fields.location.trim() ||
+    fields.availability.trim() ||
+    fields.about.enjoys.trim() ||
+    fields.about.interests.trim() ||
+    fields.about.direction.trim() ||
+    fields.about.technologies.trim() ||
+    fields.opportunities.openToOpportunities ||
+    fields.opportunities.rolesOfInterest.trim() ||
+    fields.education.trim() ||
+    fields.experience.trim() ||
+    fields.workAuthorization.trim() ||
+    fields.resumeUrl.trim() ||
+    fields.linkedinUrl.trim() ||
+    fields.githubUrl.trim() ||
+    fields.portfolioUrl.trim()
+  );
 }

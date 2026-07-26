@@ -22,9 +22,10 @@ import type {
   GroveProfileFields,
   FeaturedSeedCard,
   SkillSummary,
-  EvidenceHighlight,
+  AchievementHighlight,
   GrowthTimelineEntry,
 } from "../types/grove";
+import type { FeedPost } from "../types/feed";
 import { DEMO_SEED_ID } from "../config/demoAccount";
 
 // ---------------------------------------------------------------------------
@@ -42,6 +43,7 @@ export const DEMO_SEED: Seed = {
   description: "Real-time defect detection for manufacturing",
   sourceType: "manual",
   status: "Currently Building",
+  technologies: ["Python", "PyTorch", "CUDA", "Rust"],
   createdAt: "2026-06-08T09:00:00.000Z",
   updatedAt: "2026-07-24T12:00:00.000Z",
   progress: 78,
@@ -50,6 +52,11 @@ export const DEMO_SEED: Seed = {
   // state/seedStore.ts) and require the user to publish deliberately.
   isPublished: true,
   publishedAt: "2026-07-24T12:00:00.000Z",
+  // Stage (status, above) and lifecycle are independent — this Seed is
+  // mid-build (Currently Building) and still in_progress, illustrating
+  // that a Seed's stage never implies its lifecycle state.
+  lifecycleStatus: "in_progress",
+  completedAt: null,
 };
 
 export const previousProjects: PreviousProject[] = [
@@ -333,6 +340,13 @@ export const demoGroveProfileFields: GroveProfileFields = {
     contactVisible: true,
     contactEmail: "hema@seedandgrove.dev",
   },
+  education: "B.S. Computer Science, University of Central Florida",
+  experience: "ML Systems Intern, prior startup experience shipping real-time inference.",
+  workAuthorization: "U.S. Citizen",
+  resumeUrl: "",
+  linkedinUrl: "",
+  githubUrl: "",
+  portfolioUrl: "",
 };
 
 export const demoFeaturedSeeds: FeaturedSeedCard[] = [
@@ -342,8 +356,9 @@ export const demoFeaturedSeeds: FeaturedSeedCard[] = [
     description: DEMO_SEED.description,
     status: DEMO_SEED.status,
     progress: DEMO_SEED.progress,
+    lifecycleStatus: DEMO_SEED.lifecycleStatus,
     skills: Array.from(new Set(demoEvidenceFeed.map((item) => item.skill))),
-    evidenceCount: demoEvidenceFeed.length,
+    achievementCount: demoEvidenceFeed.length,
   },
 ];
 
@@ -353,30 +368,36 @@ export const demoSkillSummaries: SkillSummary[] = Array.from(
       const existing = map.get(item.skill);
       const supporting = { title: item.summary, seedTitle: DEMO_SEED.title };
       if (existing) {
-        existing.evidenceCount += 1;
-        existing.supportingEvidence.push(supporting);
+        existing.achievementCount += 1;
+        existing.supportingAchievements.push(supporting);
       } else {
         map.set(item.skill, {
           skill: item.skill,
-          evidenceCount: 1,
-          supportingEvidence: [supporting],
+          achievementCount: 1,
+          supportingAchievements: [supporting],
         });
       }
       return map;
     }, new Map<string, SkillSummary>())
     .values(),
-).sort((a, b) => b.evidenceCount - a.evidenceCount);
+).sort((a, b) => b.achievementCount - a.achievementCount);
 
-export const demoEvidenceHighlights: EvidenceHighlight[] = demoEvidenceFeed.map(
+export const demoAchievementHighlights: AchievementHighlight[] = demoEvidenceFeed.map(
   (item) => ({
     id: item.id,
-    title: item.summary,
-    description: item.summary,
-    seedTitle: DEMO_SEED.title,
     seedId: DEMO_SEED_ID,
+    seedTitle: DEMO_SEED.title,
+    title: item.summary,
+    shortDescription: item.summary,
+    achievementType: "milestone",
+    skillsDemonstrated: [item.skill],
+    technologiesUsed: DEMO_SEED.technologies,
+    candidateContribution: item.summary,
+    outcomeOrImpact: "",
+    proofUrl: null,
+    proofLabel: null,
+    relevantRoles: [],
     date: item.timestamp,
-    skill: item.skill,
-    visibility: "public",
   }),
 );
 
@@ -389,8 +410,8 @@ export const demoGrowthTimeline: GrowthTimelineEntry[] = [
     sortKey: new Date("2026-07-24T12:00:00.000Z").getTime(),
   },
   {
-    id: "t-evidence-latency",
-    type: "evidence_published",
+    id: "t-achievement-latency",
+    type: "achievement_published",
     title: "Cut p99 inference latency 3.5x — VISIQ",
     date: "Jul 24, 2026",
     sortKey: new Date("2026-07-24T09:00:00.000Z").getTime(),
@@ -403,10 +424,88 @@ export const demoGrowthTimeline: GrowthTimelineEntry[] = [
     sortKey: new Date("2026-07-23T09:00:00.000Z").getTime(),
   },
   {
-    id: "t-evidence-decoder",
-    type: "evidence_published",
+    id: "t-achievement-decoder",
+    type: "achievement_published",
     title: "Traced and fixed a CUDA memory leak in the async decode path — VISIQ",
     date: "Jul 24, 2026",
     sortKey: new Date("2026-07-24T08:00:00.000Z").getTime(),
+  },
+];
+
+// ---------------------------------------------------------------------------
+// Demo Dashboard feed — same isDemoAccount gating as everything above, and
+// never written to the real feed_posts table (Dashboard.tsx renders this
+// array directly for the demo account instead of calling feedStore.ts).
+// author_name is deliberately blank here: the authenticated display name
+// always comes from the real Supabase profile, never mock data (same rule
+// as the rest of this file) — Dashboard.tsx fills it in at render time.
+// ---------------------------------------------------------------------------
+
+export const demoFeedPosts: FeedPost[] = [
+  {
+    id: "demo-post-4",
+    user_id: "demo",
+    seed_id: DEMO_SEED_ID,
+    evidence_id: null,
+    post_type: "evidence_shared",
+    caption:
+      "Cut inference latency 3.5x by redesigning the frame queue as a lock-free ring buffer.",
+    author_name: "",
+    project_title: "VISIQ",
+    evidence_summary:
+      "Cut p99 inference latency 3.5x via a lock-free ring buffer redesign.",
+    skills: ["Performance Engineering"],
+    visibility: "public",
+    created_at: "2026-07-24T09:00:00.000Z",
+    updated_at: "2026-07-24T09:00:00.000Z",
+  },
+  {
+    id: "demo-post-3",
+    user_id: "demo",
+    seed_id: DEMO_SEED_ID,
+    evidence_id: null,
+    post_type: "evidence_shared",
+    caption:
+      "Finally traced that memory leak — turned out to be unreleased CUDA buffers in the async decode path.",
+    author_name: "",
+    project_title: "VISIQ",
+    evidence_summary:
+      "Traced and fixed a CUDA memory leak in the async decode path.",
+    skills: ["Debugging Under Pressure"],
+    visibility: "public",
+    created_at: "2026-07-24T08:00:00.000Z",
+    updated_at: "2026-07-24T08:00:00.000Z",
+  },
+  {
+    id: "demo-post-2",
+    user_id: "demo",
+    seed_id: DEMO_SEED_ID,
+    evidence_id: null,
+    post_type: "milestone_completed",
+    caption:
+      "Chose edge deployment over cloud inference after modeling the latency and cost tradeoffs — written up as an ADR.",
+    author_name: "",
+    project_title: "VISIQ",
+    evidence_summary:
+      "Chose edge deployment over cloud inference after modeling latency and cost tradeoffs.",
+    skills: ["Systems Design", "Technical Writing"],
+    visibility: "public",
+    created_at: "2026-07-23T09:00:00.000Z",
+    updated_at: "2026-07-23T09:00:00.000Z",
+  },
+  {
+    id: "demo-post-1",
+    user_id: "demo",
+    seed_id: DEMO_SEED_ID,
+    evidence_id: null,
+    post_type: "project_started",
+    caption: "Started building VISIQ — real-time defect detection for manufacturing.",
+    author_name: "",
+    project_title: "VISIQ",
+    evidence_summary: null,
+    skills: [],
+    visibility: "public",
+    created_at: "2026-06-08T09:00:00.000Z",
+    updated_at: "2026-06-08T09:00:00.000Z",
   },
 ];

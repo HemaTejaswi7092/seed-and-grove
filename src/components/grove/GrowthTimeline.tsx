@@ -11,7 +11,7 @@ interface GrowthTimelineProps {
 const iconByType: Record<GrowthTimelineEntryType, typeof Rocket> = {
   seed_published: Rocket,
   seed_completed: Trophy,
-  evidence_published: ShieldCheck,
+  achievement_published: ShieldCheck,
   skill_demonstrated: TrendingUp,
 };
 

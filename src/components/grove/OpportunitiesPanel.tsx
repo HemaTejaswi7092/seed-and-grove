@@ -15,7 +15,8 @@ export default function OpportunitiesPanel({
   const hasAnything =
     opportunities.openToOpportunities ||
     opportunities.rolesOfInterest.trim() ||
-    opportunities.collaborationInterests.trim();
+    opportunities.collaborationInterests.trim() ||
+    (opportunities.contactVisible && opportunities.contactEmail.trim());
 
   return (
     <section>
@@ -97,7 +98,7 @@ export default function OpportunitiesPanel({
               className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-accent px-4 py-2 text-xs font-medium text-white shadow-sm shadow-accent/20 transition-colors hover:bg-accent-dark"
             >
               <Mail className="h-3.5 w-3.5" strokeWidth={2} />
-              Contact
+              Email Candidate
             </a>
           )}
         </div>

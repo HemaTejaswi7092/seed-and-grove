@@ -6,7 +6,7 @@ import type { Seed } from "../../types/seed";
 const navItems: { tab: WorkspaceTab; label: string; icon: typeof Bot }[] = [
   { tab: "workspace", label: "Workspace", icon: Bot },
   { tab: "activity", label: "Activity", icon: Activity },
-  { tab: "evidence", label: "Evidence", icon: Sparkles },
+  { tab: "evidence", label: "Achievements", icon: Sparkles },
 ];
 
 interface WorkspaceSidebarProps {
@@ -55,18 +55,28 @@ export default function WorkspaceSidebar({
                   isActive ? "bg-white/10" : "hover:bg-white/5",
                 ].join(" ")}
               >
-                <span className="flex items-center justify-between">
+                <span className="flex items-center justify-between gap-2">
                   <span
                     className={[
-                      "text-sm font-medium",
+                      "truncate text-sm font-medium",
                       isActive ? "text-white" : "text-white/70",
                     ].join(" ")}
                   >
                     {seed.title}
                   </span>
-                  <span className="text-[11px] text-white/40">
-                    {seed.progress}%
-                  </span>
+                  {seed.lifecycleStatus === "completed" ? (
+                    <span className="shrink-0 rounded-full bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-medium text-emerald-400">
+                      Completed
+                    </span>
+                  ) : seed.lifecycleStatus === "archived" ? (
+                    <span className="shrink-0 rounded-full bg-white/10 px-1.5 py-0.5 text-[10px] font-medium text-white/40">
+                      Archived
+                    </span>
+                  ) : (
+                    <span className="shrink-0 text-[11px] text-white/40">
+                      {seed.progress}%
+                    </span>
+                  )}
                 </span>
                 <span className="h-1 w-full overflow-hidden rounded-full bg-white/10">
                   <span

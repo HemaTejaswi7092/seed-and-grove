@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Sprout, TriangleAlert } from "lucide-react";
 import { useAuth } from "../auth/useAuth";
+import { resolvePostLoginPath } from "../auth/postLoginRedirect";
 
 function readOAuthError(): string | null {
   // Supabase/GitHub deliver OAuth failures (denied access, misconfigured
@@ -46,9 +47,13 @@ export default function AuthCallback() {
       return;
     }
 
-    navigate(profile?.onboarding_completed ? "/dashboard" : "/onboarding", {
-      replace: true,
+    let cancelled = false;
+    resolvePostLoginPath(profile).then((path) => {
+      if (!cancelled) navigate(path, { replace: true });
     });
+    return () => {
+      cancelled = true;
+    };
   }, [oauthError, loading, user, profile, navigate]);
 
   if (oauthError) {

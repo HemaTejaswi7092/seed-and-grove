@@ -1,5 +1,5 @@
-import { detectSeedDomain } from "../../lib/seedDomain";
-import type { Seed, SeedActivityItem, SeedEvidenceItem } from "../../types/seed";
+import { detectSeedDomain, seedDomainLabel } from "../../lib/seedDomain";
+import type { Achievement, Seed, SeedActivityItem } from "../../types/seed";
 import type { CopilotIntent, CopilotRequest, CopilotResponse } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -241,9 +241,12 @@ const KNN_STAGES: Stage[] = [
 
 function currentStageIndex(
   activity: SeedActivityItem[],
-  evidence: SeedEvidenceItem[],
+  achievements: Achievement[],
 ): number {
-  const text = [...activity.map((a) => a.content), ...evidence.map((e) => e.description)]
+  const text = [
+    ...activity.map((a) => a.content),
+    ...achievements.map((a) => a.shortDescription),
+  ]
     .join(" ")
     .toLowerCase();
   let highest = -1;
@@ -287,9 +290,9 @@ function knnPlanFull(seed: Seed): string {
 
 function knnPlanNextStep(
   activity: SeedActivityItem[],
-  evidence: SeedEvidenceItem[],
+  achievements: Achievement[],
 ): string {
-  const idx = currentStageIndex(activity, evidence);
+  const idx = currentStageIndex(activity, achievements);
   if (idx >= KNN_STAGES.length) {
     return "You've worked through the core pipeline already, as far as I can tell from what's logged. At this point I'd focus on polishing evaluation and writing up what you learned, or shipping the Streamlit app if you haven't yet.";
   }
@@ -447,7 +450,7 @@ function progressResponse(): string {
   ].join("\n");
 }
 
-function resultResponse(message: string): CopilotResponse {
+function resultResponse(message: string, seed: Seed): CopilotResponse {
   const change = extractMetricChange(message);
   const causeNote = /scal(e|ing)|normali[sz]e|standardi[sz]e/i.test(message)
     ? "That makes sense — KNN is purely distance-based, so putting features on the same scale stops any single large-range feature from dominating the distance calculation."
@@ -460,44 +463,56 @@ function resultResponse(message: string): CopilotResponse {
       ? `That's a solid, measurable improvement (${change.metric} ${change.before}% → ${change.after}%).`
       : "That's a solid result worth recording.",
     causeNote,
-    "I've logged this as evidence for your Seed.",
+    "I've saved this as a possible achievement — review it before it's added.",
     "",
     "Want to check this against a different k, or compare it with another model next?",
   ].join("\n");
+
+  const skill = change ? capitalize(change.metric) : "Result";
 
   return {
     content,
     intent: "reporting_result",
     evidenceSuggestion: {
-      category: change ? capitalize(change.metric) : "Result",
+      category: skill,
       title: change
         ? `${capitalize(change.metric)} improved to ${change.after}%`
         : "Reported measurable result",
       description: message.trim(),
+      skillsDemonstrated: [skill],
+      technologiesUsed: seed.technologies,
+      projectDomain: seedDomainLabel(seed),
+      outcomeOrImpact: change
+        ? `${capitalize(change.metric)} improved from ${change.before}% to ${change.after}%.`
+        : message.trim(),
     },
   };
 }
 
-function decisionResponse(message: string): CopilotResponse {
+function decisionResponse(message: string, seed: Seed): CopilotResponse {
   if (!hasSpecificity(message)) {
     return {
       content:
-        "Got it — what specifically did you decide, and what made you choose it over the alternative? A bit more detail (the parameter/value and the reason) is what makes this worth recording as evidence.",
+        "Got it — what specifically did you decide, and what made you choose it over the alternative? A bit more detail (the parameter/value and the reason) is what makes this worth recording as a possible achievement.",
       intent: "reporting_decision",
     };
   }
   return {
     content: [
       "Good call — that's the kind of documented decision worth having on record.",
-      "I've logged this as evidence for your Seed.",
+      "I've saved this as a possible achievement — review it before it's added.",
       "",
       "Want to note the reasoning behind it too, in case you revisit this later?",
     ].join("\n"),
     intent: "reporting_decision",
     evidenceSuggestion: {
-      category: "Decision",
+      category: "Technical Decision",
       title: "Design decision recorded",
       description: message.trim(),
+      skillsDemonstrated: ["Technical Decision-Making"],
+      technologiesUsed: seed.technologies,
+      projectDomain: seedDomainLabel(seed),
+      candidateContribution: message.trim(),
     },
   };
 }
@@ -525,7 +540,7 @@ function wait(ms: number): Promise<void> {
 export async function generateLocalResponse(
   request: CopilotRequest,
 ): Promise<CopilotResponse> {
-  const { seed, message, activity, evidence } = request;
+  const { seed, message, activity, achievements } = request;
   const domain = detectSeedDomain(seed);
   const isKnn = domain === "knn";
   const intent = classifyIntent(message);
@@ -542,7 +557,7 @@ export async function generateLocalResponse(
       if (isKnn) {
         return {
           content: isNextStepPhrasing
-            ? knnPlanNextStep(activity, evidence)
+            ? knnPlanNextStep(activity, achievements)
             : knnPlanFull(seed),
           intent,
         };
@@ -562,9 +577,9 @@ export async function generateLocalResponse(
     case "asking_for_debugging":
       return { content: debuggingResponse(isKnn), intent };
     case "reporting_result":
-      return resultResponse(message);
+      return resultResponse(message, seed);
     case "reporting_decision":
-      return decisionResponse(message);
+      return decisionResponse(message, seed);
     case "reporting_progress":
       return { content: progressResponse(), intent, activityContent: message.trim() };
     case "general_question":

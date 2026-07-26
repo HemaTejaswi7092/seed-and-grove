@@ -15,3 +15,15 @@ export function detectSeedDomain(
     ? "knn"
     : "generic";
 }
+
+// A readable label for the achievement review form's "Project domain"
+// pre-fill (see services/ai/localAssistant.ts) — only ever a starting
+// point, always candidate-editable. Empty for "generic" rather than
+// guessing, since the detector only actually recognizes one domain today.
+export function seedDomainLabel(
+  seed: Pick<Seed, "title" | "description">,
+): string {
+  return detectSeedDomain(seed) === "knn"
+    ? "Machine Learning / Classification"
+    : "";
+}

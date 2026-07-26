@@ -53,9 +53,16 @@ export default function FeaturedSeeds({ seeds }: FeaturedSeedsProps) {
                     <p className="text-sm font-semibold text-ink">
                       {seed.title}
                     </p>
-                    <span className="mt-0.5 inline-block rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent-dark">
-                      {seed.status}
-                    </span>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                      <span className="inline-block rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent-dark">
+                        {seed.status}
+                      </span>
+                      {seed.lifecycleStatus === "completed" && (
+                        <span className="inline-block rounded-full bg-ink px-2 py-0.5 text-[11px] font-medium text-white">
+                          Completed
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -79,7 +86,7 @@ export default function FeaturedSeeds({ seeds }: FeaturedSeedsProps) {
 
               <div className="mt-5 flex items-center justify-between border-t border-border pt-4">
                 <div className="flex items-center gap-4 text-xs text-ink-faint">
-                  <span>{seed.evidenceCount} evidence points</span>
+                  <span>{seed.achievementCount} achievements</span>
                   <span>{seed.progress}% complete</span>
                 </div>
                 <Link

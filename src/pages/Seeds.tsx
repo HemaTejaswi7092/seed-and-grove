@@ -54,15 +54,27 @@ export default function Seeds() {
                 to={`/seeds/${seed.id}`}
                 className="block rounded-2xl border border-border bg-canvas-elevated p-5 transition-shadow hover:shadow-[0_12px_32px_-16px_rgba(26,28,25,0.25)]"
               >
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2">
                   <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-ink text-xs font-semibold text-white">
                     {getInitials(seed.title)}
                   </div>
-                  {seed.id === activeSeed?.id && (
-                    <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent-dark">
-                      {seed.status}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-1.5">
+                    {seed.lifecycleStatus === "completed" && (
+                      <span className="rounded-full bg-ink px-2 py-0.5 text-[11px] font-medium text-white">
+                        Completed
+                      </span>
+                    )}
+                    {seed.lifecycleStatus === "archived" && (
+                      <span className="rounded-full bg-border px-2 py-0.5 text-[11px] font-medium text-ink-faint">
+                        Archived
+                      </span>
+                    )}
+                    {seed.id === activeSeed?.id && (
+                      <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent-dark">
+                        {seed.status}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <p className="mt-3 text-sm font-semibold text-ink">
                   {seed.title}

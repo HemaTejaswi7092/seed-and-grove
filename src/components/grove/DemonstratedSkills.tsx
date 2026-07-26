@@ -34,15 +34,15 @@ export default function DemonstratedSkills({ skills }: DemonstratedSkillsProps) 
                   {skill.skill}
                 </p>
                 <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent-dark">
-                  {skill.evidenceCount}{" "}
-                  {skill.evidenceCount === 1 ? "point" : "points"}
+                  {skill.achievementCount}{" "}
+                  {skill.achievementCount === 1 ? "achievement" : "achievements"}
                 </span>
               </div>
               <p className="mt-2.5 text-xs font-medium tracking-wide text-ink-faint uppercase">
                 Supported by
               </p>
               <ul className="mt-1.5 space-y-1">
-                {skill.supportingEvidence.slice(0, 3).map((item, index) => (
+                {skill.supportingAchievements.slice(0, 3).map((item, index) => (
                   <li
                     key={`${skill.skill}-${index}`}
                     className="text-sm leading-snug text-ink-soft"

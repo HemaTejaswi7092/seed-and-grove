@@ -1,70 +1,23 @@
-import type { CopilotRequest } from "./types";
+// Reference copy of the Seed Copilot's system prompt. The actual "api"
+// mode request (see aiClient.ts) sends structured fields to the
+// seed-copilot Edge Function rather than a pre-built prompt string — the
+// Function builds its own prompt server-side from
+// supabase/functions/seed-copilot/prompt.ts, which must be kept in sync
+// with this constant by hand (Deno's module graph can't import from this
+// Vite project directly). This file is documentation, not part of the
+// live request path.
+export const SEED_COPILOT_SYSTEM_PROMPT = `You are the Seed & Grove AI Builder Copilot.
 
-// The system prompt for the Seed Copilot. Used today only as documentation
-// of intended behavior for the local dev assistant (localAssistant.ts) to
-// hold itself to, and it's what gets sent as-is once a real backend is
-// wired up (see aiClient.ts + docs/ai-integration.md) — no rewrite needed
-// at that point, just a real model reading the same instructions.
-export const SEED_COPILOT_SYSTEM_PROMPT = `You are the AI Builder Copilot for Seed & Grove.
+Your job is to help the authenticated user successfully build the current Seed.
 
-Your job is to help the user successfully build the current Seed.
+Use the retrieved Seed context, project history, recent conversation, activity, evidence, decisions, and user preferences provided below.
 
-Use the project context, user history, recent conversation, existing activity, and evidence provided below.
+Answer direct questions directly. Give concrete technical guidance. Explain why you recommend something.
 
-Answer direct questions directly. Provide actionable next steps. Explain recommendations.
+Do not repeat generic capability statements unless this is the first message.
 
-Do not invent completed work. Do not claim to have observed code, files, commits, or results unless they were provided to you explicitly.
+Do not claim to have seen code, files, commits, or results unless they are included in the supplied context. Do not invent accomplishments.
 
-When the user reports meaningful completed work, identify possible evidence, but do not create fake evidence.
+When the user reports meaningful completed work, identify a possible evidence candidate, but do not automatically publish it — that always requires the user's confirmation.
 
-Keep the conversation focused on the current Seed. Adapt explanations to the user's experience and learning style when known.`;
-
-export interface SeedPrompt {
-  systemPrompt: string;
-  contextSummary: string;
-}
-
-// Serializes a CopilotRequest into the context block a real model would
-// read alongside the system prompt above. The local dev assistant doesn't
-// need this (it works off structured fields directly), but it's exercised
-// by aiClient.ts's "api" mode today so the wiring is proven, not just
-// theoretical.
-export function buildSeedPrompt(request: CopilotRequest): SeedPrompt {
-  const { seed, user, recentMessages, activity, evidence } = request;
-
-  const historyLines = recentMessages
-    .slice(-10)
-    .map((m) => `${m.role === "user" ? "User" : "Copilot"}: ${m.content}`)
-    .join("\n");
-
-  const activityLines = activity.length
-    ? activity.map((a) => `- ${a.content}`).join("\n")
-    : "(none logged yet)";
-
-  const evidenceLines = evidence.length
-    ? evidence
-        .map((e) => `- [${e.category}] ${e.title}: ${e.description}`)
-        .join("\n")
-    : "(none logged yet)";
-
-  const contextSummary = [
-    `Seed: "${seed.title}"`,
-    `Description: ${seed.description || "(none provided)"}`,
-    `Status: ${seed.status}`,
-    `Progress: ${seed.progress}%`,
-    user.displayName ? `User: ${user.displayName}` : null,
-    "",
-    "Recent conversation:",
-    historyLines || "(no prior messages)",
-    "",
-    "Logged activity:",
-    activityLines,
-    "",
-    "Logged evidence:",
-    evidenceLines,
-  ]
-    .filter((line): line is string => line !== null)
-    .join("\n");
-
-  return { systemPrompt: SEED_COPILOT_SYSTEM_PROMPT, contextSummary };
-}
+Keep the response focused on the current project. Ask at most one useful follow-up question.`;

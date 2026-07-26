@@ -1,24 +1,42 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bot, Send, Sparkles } from "lucide-react";
+import { Bot, Send, Sparkles, ShieldCheck, ChevronDown, X } from "lucide-react";
 import { generateCopilotResponse } from "../../services/ai/aiClient";
-import { addSeedActivity, addSeedEvidence, addSeedMessage } from "../../state/seedStore";
-import type { Seed, SeedActivityItem, SeedConversationMessage, SeedEvidenceItem } from "../../types/seed";
+import { addSeedActivity, addSeedMessage } from "../../state/seedStore";
+import { createAchievement } from "../../state/achievements";
+import AchievementReviewModal from "./AchievementReviewModal";
+import type { Seed, SeedActivityItem, SeedConversationMessage, Achievement } from "../../types/seed";
+import type { EvidenceSuggestion, RetrievedContextItem } from "../../services/ai/types";
 
 interface CopilotChatProps {
   seed: Seed;
   userId: string | null;
   initialMessages: SeedConversationMessage[];
   activity: SeedActivityItem[];
-  evidence: SeedEvidenceItem[];
+  achievements: Achievement[];
   persist: boolean;
-  // Called after evidence or activity is written to the store, so the
-  // parent page can re-read it and refresh the Evidence panel/stats —
-  // this component has no reactive link to Seed.tsx otherwise.
+  // Called after an achievement or activity is written to the store, so
+  // the parent page can re-read it and refresh the Achievements panel/
+  // stats — this component has no reactive link to Seed.tsx otherwise.
   onDataCaptured?: () => void;
 }
 
 type SendStatus = "idle" | "sending" | "error";
+type EvidenceStatus = "pending" | "saved" | "dismissed";
+
+// Per-AI-message extras that don't belong on the persisted
+// SeedConversationMessage record itself: an evidence suggestion awaiting
+// the candidate's review (see the product rule — nothing is ever
+// auto-published, and the candidate edits every field before it's saved
+// as an Achievement), and the memory this reply was grounded in ("Why
+// this answer?"). Both are session-only, keyed by message id, and don't
+// survive a refresh — the saved/dismissed choice is the only durable
+// outcome (it's written via state/achievements.ts's createAchievement).
+interface MessageExtra {
+  evidenceSuggestion?: EvidenceSuggestion;
+  evidenceStatus?: EvidenceStatus;
+  retrievedContext?: RetrievedContextItem[];
+}
 
 // Kept outside the component: an ephemeral (non-persisted, demo-mode)
 // message id just needs to be unique for a React key, but generating it
@@ -81,7 +99,7 @@ export default function CopilotChat({
   userId,
   initialMessages,
   activity,
-  evidence,
+  achievements,
   persist,
   onDataCaptured,
 }: CopilotChatProps) {
@@ -92,6 +110,9 @@ export default function CopilotChat({
   const [status, setStatus] = useState<SendStatus>("idle");
   const [errorText, setErrorText] = useState<string | null>(null);
   const [pendingText, setPendingText] = useState<string | null>(null);
+  const [messageExtras, setMessageExtras] = useState<Record<string, MessageExtra>>({});
+  const [expandedContext, setExpandedContext] = useState<Set<string>>(new Set());
+  const [reviewMessageId, setReviewMessageId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -123,22 +144,31 @@ export default function CopilotChat({
         seed,
         recentMessages: historyForContext,
         activity,
-        evidence,
+        achievements,
         message: userText,
       });
 
-      appendMessage("ai", response.content);
+      const aiMessage = appendMessage("ai", response.content);
 
-      if (persist && userId) {
-        if (response.evidenceSuggestion) {
-          addSeedEvidence(userId, seed.id, response.evidenceSuggestion);
-        }
-        if (response.activityContent) {
-          addSeedActivity(userId, seed.id, "progress", response.activityContent);
-        }
-        if (response.evidenceSuggestion || response.activityContent) {
-          onDataCaptured?.();
-        }
+      // Evidence is never auto-published — only tracked here so the
+      // confirm/dismiss card can render, and only written to the Seed's
+      // record via handleConfirmEvidence below, on explicit user action.
+      // Not offered at all in non-persisting (demo) mode, where there's no
+      // real Seed record to write it to.
+      if (persist && (response.evidenceSuggestion || response.retrievedContext?.length)) {
+        setMessageExtras((prev) => ({
+          ...prev,
+          [aiMessage.id]: {
+            evidenceSuggestion: response.evidenceSuggestion,
+            evidenceStatus: response.evidenceSuggestion ? "pending" : undefined,
+            retrievedContext: response.retrievedContext,
+          },
+        }));
+      }
+
+      if (persist && userId && response.activityContent) {
+        addSeedActivity(userId, seed.id, "progress", response.activityContent);
+        onDataCaptured?.();
       }
 
       setStatus("idle");
@@ -170,6 +200,34 @@ export default function CopilotChat({
     if (pendingText) void requestReply(pendingText, messages);
   }
 
+  async function handleSaveAchievement(input: Parameters<typeof createAchievement>[2]) {
+    if (!reviewMessageId || !userId) return;
+    await createAchievement(userId, seed.id, input);
+    const messageId = reviewMessageId;
+    setMessageExtras((prev) => ({
+      ...prev,
+      [messageId]: { ...prev[messageId], evidenceStatus: "saved" },
+    }));
+    setReviewMessageId(null);
+    onDataCaptured?.();
+  }
+
+  function handleDismissEvidence(messageId: string) {
+    setMessageExtras((prev) => ({
+      ...prev,
+      [messageId]: { ...prev[messageId], evidenceStatus: "dismissed" },
+    }));
+  }
+
+  function toggleContext(messageId: string) {
+    setExpandedContext((prev) => {
+      const next = new Set(prev);
+      if (next.has(messageId)) next.delete(messageId);
+      else next.add(messageId);
+      return next;
+    });
+  }
+
   return (
     <div className="flex h-[560px] flex-col overflow-hidden rounded-2xl border border-border bg-canvas-elevated">
       <div className="flex items-center gap-2 border-b border-border px-5 py-4">
@@ -188,32 +246,107 @@ export default function CopilotChat({
         ref={scrollRef}
         className="flex-1 space-y-4 overflow-y-auto px-5 py-5"
       >
-        {messages.map((message) => (
-          <motion.div
-            key={message.id}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, ease: "easeOut" }}
-            className={
-              message.role === "user"
-                ? "flex justify-end"
-                : "flex justify-start"
-            }
-          >
-            <div
+        {messages.map((message) => {
+          const extra = messageExtras[message.id];
+          const isContextExpanded = expandedContext.has(message.id);
+
+          return (
+            <motion.div
+              key={message.id}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
               className={[
-                "max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
-                message.role === "user"
-                  ? "rounded-br-sm bg-ink text-white"
-                  : "rounded-bl-sm border border-accent-soft-border bg-accent-soft text-ink",
+                "flex flex-col gap-1.5",
+                message.role === "user" ? "items-end" : "items-start",
               ].join(" ")}
             >
-              <div className="flex flex-col gap-2">
-                {renderMessageContent(message.content)}
+              <div
+                className={[
+                  "max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
+                  message.role === "user"
+                    ? "rounded-br-sm bg-ink text-white"
+                    : "rounded-bl-sm border border-accent-soft-border bg-accent-soft text-ink",
+                ].join(" ")}
+              >
+                <div className="flex flex-col gap-2">
+                  {renderMessageContent(message.content)}
+                </div>
               </div>
-            </div>
-          </motion.div>
-        ))}
+
+              {extra?.evidenceStatus === "pending" && extra.evidenceSuggestion && (
+                <div className="w-full max-w-[85%] rounded-xl border border-accent-soft-border bg-canvas px-3.5 py-3">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-accent-dark">
+                    <ShieldCheck className="h-3.5 w-3.5" strokeWidth={2} />
+                    Possible achievement: {extra.evidenceSuggestion.category}
+                  </div>
+                  <p className="mt-1.5 text-sm text-ink">
+                    {extra.evidenceSuggestion.title}
+                  </p>
+                  <div className="mt-2.5 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setReviewMessageId(message.id)}
+                      className="inline-flex items-center gap-1 rounded-full bg-accent px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-accent-dark"
+                    >
+                      <ShieldCheck className="h-3 w-3" strokeWidth={2.5} />
+                      Save as Achievement
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDismissEvidence(message.id)}
+                      className="inline-flex items-center gap-1 rounded-full border border-border px-3 py-1.5 text-xs font-medium text-ink-soft transition-colors hover:border-ink-faint hover:text-ink"
+                    >
+                      <X className="h-3 w-3" strokeWidth={2.5} />
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {extra?.evidenceStatus === "saved" && (
+                <p className="flex items-center gap-1 text-[11px] font-medium text-accent-dark">
+                  <ShieldCheck className="h-3 w-3" strokeWidth={2} />
+                  Saved as an achievement
+                </p>
+              )}
+
+              {!!extra?.retrievedContext?.length && (
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => toggleContext(message.id)}
+                    className="flex items-center gap-1 text-[11px] font-medium text-ink-faint transition-colors hover:text-ink-soft"
+                  >
+                    Why this answer?
+                    <ChevronDown
+                      className={[
+                        "h-3 w-3 transition-transform",
+                        isContextExpanded ? "rotate-180" : "",
+                      ].join(" ")}
+                      strokeWidth={2}
+                    />
+                  </button>
+                  {isContextExpanded && (
+                    <ul className="mt-1.5 max-w-[85%] space-y-1 rounded-lg border border-border bg-canvas px-3 py-2">
+                      {extra.retrievedContext.map((item, index) => (
+                        <li
+                          key={`${message.id}-ctx-${index}`}
+                          className="text-[11px] leading-snug text-ink-soft"
+                        >
+                          <span className="font-medium text-ink-faint">
+                            {item.sourceType}:
+                          </span>{" "}
+                          {item.label}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </motion.div>
+          );
+        })}
 
         <AnimatePresence>
           {status === "sending" && (
@@ -291,6 +424,39 @@ export default function CopilotChat({
           </button>
         </div>
       </div>
+
+      {reviewMessageId && messageExtras[reviewMessageId]?.evidenceSuggestion && (
+        <AchievementReviewModal
+          mode="create"
+          initial={{
+            title: messageExtras[reviewMessageId].evidenceSuggestion!.title,
+            shortDescription: messageExtras[reviewMessageId].evidenceSuggestion!.description,
+            achievementType: "milestone",
+            skillsDemonstrated: (
+              messageExtras[reviewMessageId].evidenceSuggestion!.skillsDemonstrated ?? [
+                messageExtras[reviewMessageId].evidenceSuggestion!.category,
+              ]
+            ).join(", "),
+            technologiesUsed: (
+              messageExtras[reviewMessageId].evidenceSuggestion!.technologiesUsed ?? []
+            ).join(", "),
+            projectDomain:
+              messageExtras[reviewMessageId].evidenceSuggestion!.projectDomain ?? "",
+            candidateContribution:
+              messageExtras[reviewMessageId].evidenceSuggestion!.candidateContribution ?? "",
+            outcomeOrImpact:
+              messageExtras[reviewMessageId].evidenceSuggestion!.outcomeOrImpact ?? "",
+            proofUrl: "",
+            proofLabel: "",
+            relevantRoles: (
+              messageExtras[reviewMessageId].evidenceSuggestion!.relevantRoles ?? []
+            ).join(", "),
+            visibility: "private",
+          }}
+          onClose={() => setReviewMessageId(null)}
+          onSave={handleSaveAchievement}
+        />
+      )}
     </div>
   );
 }

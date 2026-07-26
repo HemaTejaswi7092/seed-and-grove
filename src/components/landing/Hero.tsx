@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Sparkles, ArrowRight } from "lucide-react";
+import { Sparkles, User, Briefcase } from "lucide-react";
 
 export default function Hero() {
   return (
@@ -42,22 +42,67 @@ export default function Hero() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.55, ease: "easeOut", delay: 0.15 }}
-          className="mt-9 flex flex-col items-center gap-3 sm:flex-row"
+          className="mt-10 grid w-full max-w-2xl grid-cols-1 gap-4 sm:grid-cols-2"
         >
-          <Link
-            to="/signin"
-            className="group inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3 text-sm font-medium text-white shadow-sm shadow-accent/20 transition-colors hover:bg-accent-dark"
-          >
-            Get Started
-            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-          </Link>
-          <Link
-            to="/grove"
-            className="inline-flex items-center gap-2 rounded-full border border-border bg-canvas-elevated px-6 py-3 text-sm font-medium text-ink transition-colors hover:border-ink-faint"
-          >
-            Explore Grove
-          </Link>
+          <div className="rounded-2xl border border-border bg-canvas-elevated p-6 text-left">
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-accent-soft text-accent">
+              <User className="h-4 w-4" strokeWidth={2.25} />
+            </span>
+            <p className="mt-3 text-base font-semibold text-ink">
+              I&apos;m a Candidate
+            </p>
+            <p className="mt-1 text-sm text-ink-soft">
+              Build a Grove from your real, demonstrated work.
+            </p>
+            <div className="mt-4 flex items-center gap-2">
+              <Link
+                to="/signin"
+                className="inline-flex flex-1 items-center justify-center rounded-full border border-border px-4 py-2 text-sm font-medium text-ink transition-colors hover:border-ink-faint"
+              >
+                Login
+              </Link>
+              <Link
+                to="/signup"
+                className="inline-flex flex-1 items-center justify-center rounded-full bg-accent px-4 py-2 text-sm font-medium text-white shadow-sm shadow-accent/20 transition-colors hover:bg-accent-dark"
+              >
+                Sign Up
+              </Link>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-border bg-canvas-elevated p-6 text-left">
+            <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-ink-soft/10 text-ink">
+              <Briefcase className="h-4 w-4" strokeWidth={2.25} />
+            </span>
+            <p className="mt-3 text-base font-semibold text-ink">
+              I&apos;m a Recruiter
+            </p>
+            <p className="mt-1 text-sm text-ink-soft">
+              Post roles and discover evidence-backed candidates.
+            </p>
+            <div className="mt-4 flex items-center gap-2">
+              <Link
+                to="/recruiter/signin"
+                className="inline-flex flex-1 items-center justify-center rounded-full border border-border px-4 py-2 text-sm font-medium text-ink transition-colors hover:border-ink-faint"
+              >
+                Recruiter Login
+              </Link>
+              <Link
+                to="/recruiter/signup"
+                className="inline-flex flex-1 items-center justify-center rounded-full bg-ink px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-ink-800"
+              >
+                Recruiter Sign Up
+              </Link>
+            </div>
+          </div>
         </motion.div>
+
+        <Link
+          to="/grove"
+          className="mt-6 text-sm text-ink-soft transition-colors hover:text-ink"
+        >
+          Explore Grove
+        </Link>
       </div>
     </section>
   );

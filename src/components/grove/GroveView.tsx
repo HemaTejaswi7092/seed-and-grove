@@ -3,9 +3,10 @@ import ProfileIdentityCard from "./ProfileIdentityCard";
 import GroveStrengthMeter from "./GroveStrengthMeter";
 import FeaturedSeeds from "./FeaturedSeeds";
 import DemonstratedSkills from "./DemonstratedSkills";
-import EvidenceHighlights from "./EvidenceHighlights";
+import AchievementHighlights from "./AchievementHighlights";
 import GrowthTimeline from "./GrowthTimeline";
 import AboutBuilder from "./AboutBuilder";
+import ProfessionalDetails from "./ProfessionalDetails";
 import OpportunitiesPanel from "./OpportunitiesPanel";
 import GroveEmptyState from "./GroveEmptyState";
 import EditGroveModal from "./EditGroveModal";
@@ -14,7 +15,7 @@ import type {
   GroveStrength,
   FeaturedSeedCard,
   SkillSummary,
-  EvidenceHighlight,
+  AchievementHighlight,
   GrowthTimelineEntry,
 } from "../../types/grove";
 
@@ -29,7 +30,7 @@ interface GroveViewProps {
   strength: GroveStrength;
   featuredSeeds: FeaturedSeedCard[];
   skills: SkillSummary[];
-  evidenceHighlights: EvidenceHighlight[];
+  achievementHighlights: AchievementHighlight[];
   timeline: GrowthTimelineEntry[];
   isOwner: boolean;
   isFreshGrove: boolean;
@@ -39,7 +40,7 @@ interface GroveViewProps {
   editOpen: boolean;
   onOpenEdit: () => void;
   onCloseEdit: () => void;
-  onSaveProfile: (fields: GroveProfileFields) => void;
+  onSaveProfile: (fields: GroveProfileFields) => Promise<void>;
   readOnlyProfile: boolean;
   toast: string | null;
 }
@@ -51,7 +52,7 @@ export default function GroveView({
   strength,
   featuredSeeds,
   skills,
-  evidenceHighlights,
+  achievementHighlights,
   timeline,
   isOwner,
   isFreshGrove,
@@ -66,7 +67,7 @@ export default function GroveView({
   toast,
 }: GroveViewProps) {
   const stats = [
-    { label: "Published Evidence", value: evidenceHighlights.length },
+    { label: "Published Achievements", value: achievementHighlights.length },
     { label: "Published Seeds", value: featuredSeeds.length },
     { label: "Demonstrated Skills", value: skills.length },
   ];
@@ -120,10 +121,15 @@ export default function GroveView({
         >
           <FeaturedSeeds seeds={featuredSeeds} />
           <DemonstratedSkills skills={skills} />
-          <EvidenceHighlights evidence={evidenceHighlights} />
+          <AchievementHighlights achievements={achievementHighlights} />
           <GrowthTimeline entries={timeline} />
           <AboutBuilder
             about={profileFields.about}
+            isOwner={isOwner && !isPreview}
+            onEdit={onOpenEdit}
+          />
+          <ProfessionalDetails
+            fields={profileFields}
             isOwner={isOwner && !isPreview}
             onEdit={onOpenEdit}
           />

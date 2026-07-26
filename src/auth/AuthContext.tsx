@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
 import { AuthContext } from "./context";
-import type { Profile } from "./types";
+import type { AccountType, Profile } from "./types";
 
 async function loadOrCreateProfile(authUser: User): Promise<Profile | null> {
   const { data, error } = await supabase
@@ -134,16 +134,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Email/password auth — unchanged.
+  // Email/password auth. account_type rides in the same signUp() call as
+  // full_name — the handle_new_user() trigger (see
+  // supabase/recruiter_accounts.sql) reads it off auth.users' metadata the
+  // moment the row is created, which happens immediately regardless of
+  // whether email confirmation gates session issuance. That's what lets a
+  // recruiter be correctly marked as one even before they confirm.
   async function signUpWithEmail(
     fullName: string,
     email: string,
     password: string,
+    accountType: AccountType = "candidate",
   ) {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName } },
+      options: { data: { full_name: fullName, account_type: accountType } },
     });
     if (error) throw error;
     // If email confirmation is required, Supabase returns a user but no
@@ -178,6 +184,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(null);
   }
 
+  // Requires an active session — Supabase validates the new password
+  // against the project's password policy server-side; that error (e.g.
+  // "too short") surfaces to the caller as-is. No current-password
+  // re-entry needed, same as Supabase's own recommended flow, since this
+  // only works with an already-authenticated session.
+  async function updatePassword(newPassword: string) {
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) throw error;
+  }
+
+  // For someone who can't sign in at all (forgot their password) — sends
+  // a reset-link email; distinct from updatePassword above, which is for
+  // an already-signed-in user changing their password from Settings.
+  async function resetPasswordForEmail(email: string) {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth/callback`,
+    });
+    if (error) throw error;
+  }
+
   async function completeOnboarding() {
     if (!user) return;
     const { data } = await supabase
@@ -186,6 +212,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .eq("id", user.id)
       .select()
       .maybeSingle();
+    if (data) setProfile(data as Profile);
+  }
+
+  async function updateFullName(fullName: string) {
+    if (!user) return;
+    const { data, error } = await supabase
+      .from("profiles")
+      .update({ full_name: fullName })
+      .eq("id", user.id)
+      .select()
+      .maybeSingle();
+    if (error) throw error;
     if (data) setProfile(data as Profile);
   }
 
@@ -202,6 +240,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signInWithGitHub,
         signOut,
         completeOnboarding,
+        updateFullName,
+        updatePassword,
+        resetPasswordForEmail,
       }}
     >
       {children}

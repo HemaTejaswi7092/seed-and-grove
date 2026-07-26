@@ -48,7 +48,7 @@ export function useActiveProject(): ActiveProjectResult {
       value: String(daysSince(activeSeed.createdAt)),
     },
     { label: "Commits logged", value: "0" },
-    { label: "Evidence points", value: "0" },
+    { label: "Achievements", value: "0" },
     { label: "Skills demonstrated", value: "0" },
   ];
 

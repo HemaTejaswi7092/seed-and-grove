@@ -3,9 +3,9 @@ import type { GroveStrength } from "../types/grove";
 export interface GroveStrengthInput {
   hasHeadlineOrBio: boolean;
   hasFirstSeed: boolean;
-  hasEvidenceCaptured: boolean;
+  hasAchievementCaptured: boolean;
   hasFirstPublishedSeed: boolean;
-  hasPublicEvidence: boolean;
+  hasPublishedAchievement: boolean;
   hasAboutSection: boolean;
 }
 
@@ -22,9 +22,9 @@ export function calculateGroveStrength(
       done: input.hasFirstSeed,
     },
     {
-      key: "evidence_captured",
-      label: "Capture your first evidence",
-      done: input.hasEvidenceCaptured,
+      key: "achievement_captured",
+      label: "Capture your first achievement",
+      done: input.hasAchievementCaptured,
     },
     {
       key: "publish_seed",
@@ -32,9 +32,9 @@ export function calculateGroveStrength(
       done: input.hasFirstPublishedSeed,
     },
     {
-      key: "public_evidence",
-      label: "Publish evidence to your Grove",
-      done: input.hasPublicEvidence,
+      key: "published_achievement",
+      label: "Publish an achievement to your Grove",
+      done: input.hasPublishedAchievement,
     },
     {
       key: "headline",
