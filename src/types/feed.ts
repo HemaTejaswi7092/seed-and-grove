@@ -12,7 +12,15 @@ export type FeedPostType =
   | "skill_demonstrated"
   | "project_completed"
   | "achievement_added"
-  | "grove_update";
+  | "grove_update"
+  // Recruiter-authored Company Posts — see recruiter_posts_and_grove.sql.
+  | "company_award"
+  | "hiring_announcement"
+  | "team_achievement"
+  | "industry_update"
+  | "company_news";
+
+export type FeedPostAuthorAccountType = "candidate" | "recruiter";
 
 export type FeedPostVisibility = "public" | "private";
 
@@ -29,12 +37,16 @@ export interface FeedPost {
   // table's RLS only allows reading your own row, so a cross-user feed
   // has no other way to show who posted. See feed_posts.sql.
   author_name: string;
+  // Snapshotted alongside author_name — lets FeedPostCard branch the
+  // author link (candidate Grove vs. recruiter Grove) without a join.
+  // See supabase/recruiter_posts_and_grove.sql.
+  author_account_type: FeedPostAuthorAccountType;
   project_title: string | null;
   // The shared Achievement's own title — distinct from project_title
   // (the Seed's title) and evidence_summary (the Achievement's short
   // description). Null for post types with no Achievement attached
-  // (project_started, project_completed, grove_update). See
-  // supabase/feed_posts_achievement_title.sql.
+  // (project_started, project_completed, grove_update, and every
+  // recruiter Company Post type). See supabase/feed_posts_achievement_title.sql.
   achievement_title: string | null;
   evidence_summary: string | null;
   skills: string[];
@@ -51,6 +63,7 @@ export interface CreateFeedPostInput {
   post_type: FeedPostType;
   caption: string;
   author_name: string;
+  author_account_type: FeedPostAuthorAccountType;
   project_title: string | null;
   achievement_title: string | null;
   evidence_summary: string | null;

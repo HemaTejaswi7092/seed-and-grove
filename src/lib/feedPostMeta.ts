@@ -6,6 +6,10 @@ import {
   PartyPopper,
   Award,
   Sprout,
+  Megaphone,
+  Users,
+  Newspaper,
+  Building2,
   type LucideIcon,
 } from "lucide-react";
 import type { FeedPostType } from "../types/feed";
@@ -26,4 +30,9 @@ export const FEED_POST_META: Record<FeedPostType, FeedPostMeta> = {
   project_completed: { label: "completed a project", icon: PartyPopper },
   achievement_added: { label: "added an achievement", icon: Award },
   grove_update: { label: "updated their Grove", icon: Sprout },
+  company_award: { label: "earned a company award", icon: Trophy },
+  hiring_announcement: { label: "shared a hiring announcement", icon: Megaphone },
+  team_achievement: { label: "shared a team achievement", icon: Users },
+  industry_update: { label: "shared an industry update", icon: Newspaper },
+  company_news: { label: "shared company news", icon: Building2 },
 };

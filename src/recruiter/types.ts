@@ -3,6 +3,17 @@
 // since both recruiter_profiles and jobs are real Supabase-backed tables.
 // See supabase/recruiter_accounts.sql and supabase/jobs.sql.
 
+import type { CertificationEntry, EducationEntry, ExperienceEntry } from "../types/grove";
+
+// A Recruiter Grove "Featured Video" — deliberately just a link, not an
+// upload (no video storage anywhere in this app) — see
+// recruiter_grove_profile.sql.
+export interface VideoEntry {
+  id: string;
+  title: string;
+  url: string;
+}
+
 export interface RecruiterProfile {
   user_id: string;
   work_email: string;
@@ -13,13 +24,34 @@ export interface RecruiterProfile {
   company_logo_url: string | null;
   hiring_locations: string[];
   hiring_roles: string[];
+  // Recruiter Grove fields — see recruiter_grove_profile.sql. experience/
+  // education/certifications reuse candidate_profiles' exact jsonb shape
+  // (types/grove.ts) verbatim, camelCase-as-stored.
+  professional_bio: string;
+  hiring_philosophy: string;
+  experience: ExperienceEntry[];
+  education: EducationEntry[];
+  certifications: CertificationEntry[];
+  industry: string;
+  team_or_department: string;
+  company_description: string;
+  hiring_domains: string[];
+  hiring_skills: string[];
+  // Seniority levels recruited for (Internship/New Grad/Mid Level/...) —
+  // distinct from hiring_roles (what) and hiring_domains (which fields).
+  // See recruiter_grove_hiring_levels.sql.
+  hiring_levels: string[];
+  videos: VideoEntry[];
   created_at: string;
   updated_at: string;
 }
 
-// What the signup wizard / recruiter profile editor sends — user_id is
+// What the signup wizard / Recruiter Grove editor sends — user_id is
 // supplied separately by recruiterStore.ts (from the authenticated
-// caller), never taken from here.
+// caller), never taken from here. The Grove fields are optional: the
+// signup wizard's createRecruiterProfile call never sets them (Postgres
+// applies the column defaults on insert — see recruiter_grove_profile.sql)
+// — only RecruiterGroveEditor.tsx sets them, on update.
 export interface RecruiterProfileInput {
   work_email: string;
   company_name: string;
@@ -29,6 +61,18 @@ export interface RecruiterProfileInput {
   company_logo_url: string | null;
   hiring_locations: string[];
   hiring_roles: string[];
+  professional_bio?: string;
+  hiring_philosophy?: string;
+  experience?: ExperienceEntry[];
+  education?: EducationEntry[];
+  certifications?: CertificationEntry[];
+  industry?: string;
+  team_or_department?: string;
+  company_description?: string;
+  hiring_domains?: string[];
+  hiring_skills?: string[];
+  hiring_levels?: string[];
+  videos?: VideoEntry[];
 }
 
 export type EmploymentType =
@@ -89,12 +133,30 @@ export interface JobInput {
 // not a second algorithm.
 
 // Public, non-sensitive slice of recruiter_profiles — see
-// supabase/opportunities_matching.sql's recruiter_profiles_public view.
+// supabase/opportunities_matching.sql's recruiter_profiles_public view,
+// widened by recruiter_posts_and_grove.sql and recruiter_grove_profile.sql
+// to cover the full Recruiter Grove. work_email stays excluded.
 export interface RecruiterProfilePublic {
   user_id: string;
   company_name: string;
+  company_website: string | null;
   company_logo_url: string | null;
   company_location: string | null;
+  job_title: string;
+  hiring_roles: string[];
+  hiring_locations: string[];
+  professional_bio: string;
+  hiring_philosophy: string;
+  experience: ExperienceEntry[];
+  education: EducationEntry[];
+  certifications: CertificationEntry[];
+  industry: string;
+  team_or_department: string;
+  company_description: string;
+  hiring_domains: string[];
+  hiring_skills: string[];
+  hiring_levels: string[];
+  videos: VideoEntry[];
 }
 
 export interface JobMatchAchievement {

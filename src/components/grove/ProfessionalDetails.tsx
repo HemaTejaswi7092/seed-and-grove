@@ -1,5 +1,8 @@
 import { Link } from "react-router-dom";
-import { GraduationCap, Award, Users } from "lucide-react";
+import { GraduationCap, Users } from "lucide-react";
+import ExperienceList from "./ExperienceList";
+import EducationList from "./EducationList";
+import CertificationList from "./CertificationList";
 import type { GroveProfileFields } from "../../types/grove";
 
 type DetailFields = Pick<
@@ -89,25 +92,8 @@ export default function ProfessionalDetails({
           <p className="text-xs font-medium tracking-wide text-ink-faint uppercase">
             Experience
           </p>
-          <div className="mt-3 space-y-4">
-            {fields.experience.map((entry) => (
-              <div key={entry.id}>
-                <p className="text-sm font-semibold text-ink">
-                  {entry.title}
-                  {entry.company && <span className="text-ink-soft"> · {entry.company}</span>}
-                </p>
-                <p className="mt-0.5 text-xs text-ink-faint">
-                  {[entry.location, `${entry.startDate || "—"} – ${entry.currentlyWorking ? "Present" : entry.endDate || "—"}`]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </p>
-                {entry.description && (
-                  <p className="mt-1.5 text-sm leading-relaxed text-ink-soft">
-                    {entry.description}
-                  </p>
-                )}
-              </div>
-            ))}
+          <div className="mt-3">
+            <ExperienceList entries={fields.experience} />
           </div>
         </div>
       )}
@@ -117,24 +103,8 @@ export default function ProfessionalDetails({
           <p className="text-xs font-medium tracking-wide text-ink-faint uppercase">
             Education
           </p>
-          <div className="mt-3 space-y-4">
-            {fields.education.map((entry) => (
-              <div key={entry.id}>
-                <p className="text-sm font-semibold text-ink">
-                  {[entry.degree, entry.fieldOfStudy].filter(Boolean).join(", ")}
-                </p>
-                <p className="mt-0.5 text-xs text-ink-faint">
-                  {[entry.institution, `${entry.startYear || "—"}–${entry.endYear || "—"}`]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </p>
-                {entry.description && (
-                  <p className="mt-1.5 text-sm leading-relaxed text-ink-soft">
-                    {entry.description}
-                  </p>
-                )}
-              </div>
-            ))}
+          <div className="mt-3">
+            <EducationList entries={fields.education} />
           </div>
         </div>
       )}
@@ -144,28 +114,8 @@ export default function ProfessionalDetails({
           <p className="text-xs font-medium tracking-wide text-ink-faint uppercase">
             Certifications
           </p>
-          <div className="mt-3 space-y-3">
-            {fields.certifications.map((entry) => (
-              <div key={entry.id} className="flex items-start gap-2.5">
-                <Award className="mt-0.5 h-4 w-4 shrink-0 text-accent" strokeWidth={2} />
-                <div>
-                  <p className="text-sm font-semibold text-ink">{entry.name}</p>
-                  <p className="text-xs text-ink-faint">
-                    {[entry.issuingOrganization, entry.issueDate].filter(Boolean).join(" · ")}
-                  </p>
-                  {entry.credentialUrl && (
-                    <a
-                      href={entry.credentialUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-xs font-medium text-accent-dark transition-colors hover:text-accent"
-                    >
-                      View credential
-                    </a>
-                  )}
-                </div>
-              </div>
-            ))}
+          <div className="mt-3">
+            <CertificationList entries={fields.certifications} />
           </div>
         </div>
       )}

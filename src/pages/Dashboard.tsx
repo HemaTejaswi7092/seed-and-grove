@@ -17,6 +17,7 @@ import {
   followUser,
   unfollowUser,
 } from "../state/feedStore";
+import { rankFeed } from "../lib/rankFeed";
 import {
   demoFeedPosts,
   demoGroveProfileFields,
@@ -29,22 +30,6 @@ import FeedEmptyState from "../components/dashboard/FeedEmptyState";
 import FeedPostCard from "../components/dashboard/FeedPostCard";
 import GlobalSearchBar from "../components/dashboard/GlobalSearchBar";
 import type { FeedPost } from "../types/feed";
-
-// Ranks the feed as: posts from people the viewer follows (most recent
-// first), then everyone else — including the viewer's own posts, which
-// deliberately are NOT boosted here. Own posts just fall into the
-// "everyone else" tier and sort purely by recency alongside strangers',
-// same as LinkedIn's home feed favors your network without literally
-// hiding the rest of the platform. Still one continuous list — no
-// section headers, no separate "Following" vs "Discover" split.
-function rankFeed(posts: FeedPost[], followingIds: Set<string>): FeedPost[] {
-  return [...posts].sort((a, b) => {
-    const aFollowed = followingIds.has(a.user_id) ? 1 : 0;
-    const bFollowed = followingIds.has(b.user_id) ? 1 : 0;
-    if (aFollowed !== bFollowed) return bFollowed - aFollowed;
-    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-  });
-}
 
 // The Dashboard is the public activity feed — a 3-column layout (Grove
 // summary / feed / suggestions) that collapses to a single column on
@@ -274,6 +259,7 @@ export default function Dashboard() {
                       key={post.id}
                       post={post}
                       isOwnPost={isOwnPost}
+                      viewerAccountType="candidate"
                       index={index}
                       isAchievementLinkValid={
                         !!post.evidence_id && validAchievementIds.has(post.evidence_id)

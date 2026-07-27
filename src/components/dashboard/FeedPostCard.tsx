@@ -14,6 +14,14 @@ interface FeedPostCardProps {
   // than link somewhere broken, those actions are simply omitted for
   // anyone else's post.
   isOwnPost: boolean;
+  // Which gated layout the current viewer is authenticated under
+  // (AuthenticatedLayout vs. RecruiterLayout) — needed because the
+  // *viewer's* account type, not just the post author's, determines which
+  // route can actually render without being redirected away by the
+  // other layout's gate (see App.tsx: candidates and recruiters each have
+  // their own route to view a candidate profile, and their own route to
+  // view a recruiter Grove).
+  viewerAccountType: "candidate" | "recruiter";
   index?: number;
   // Both omitted for own posts (can't follow yourself) and for the demo
   // account (its posts have no real auth.users row to follow).
@@ -60,6 +68,7 @@ function TitleLine({
 export default function FeedPostCard({
   post,
   isOwnPost,
+  viewerAccountType,
   index = 0,
   isFollowing,
   onToggleFollow,
@@ -68,13 +77,23 @@ export default function FeedPostCard({
   const navigate = useNavigate();
   const meta = FEED_POST_META[post.post_type];
   const Icon = meta.icon;
-  const profileHref = `/candidates/${post.user_id}/preview`;
+  const isRecruiterPost = post.author_account_type === "recruiter";
+  // Four combinations of (viewer type, author type), each with its own
+  // route so the target renders under the viewer's own gated layout
+  // instead of being redirected away by the other one (see App.tsx).
+  const profileHref =
+    viewerAccountType === "recruiter"
+      ? isRecruiterPost
+        ? `/recruiter/recruiters/${post.user_id}`
+        : `/recruiter/candidates/${post.user_id}`
+      : isRecruiterPost
+        ? `/recruiters/${post.user_id}`
+        : `/candidates/${post.user_id}/preview`;
 
-  // Reuses the existing candidate-preview route (see App.tsx) — no new
-  // page. The whole card is one click target rather than a separate
-  // "View Profile" button; interactive children (Follow, the own-post
-  // View Project/View Grove links) stop propagation in their own
-  // handlers below so they keep working independently.
+  // The whole card is one click target rather than a separate "View
+  // Profile" button; interactive children (Follow, the own-post View
+  // Project/View Grove links) stop propagation in their own handlers
+  // below so they keep working independently.
   function goToProfile() {
     navigate(profileHref);
   }
@@ -163,9 +182,9 @@ export default function FeedPostCard({
             <div className={post.project_title ? "mt-0.5" : undefined}>
               <TitleLine
                 text={post.achievement_title}
-                // Reuses the same anchor DiscoverFeedCard.tsx already links
-                // to on this page (see FeaturedSeeds.tsx's project cards) —
-                // achievements no longer have their own standalone anchor,
+                // Reuses the same anchor FeaturedSeeds.tsx's project cards
+                // expose on the candidate's own Grove — achievements have
+                // no standalone anchor of their own,
                 // so this deep-links to the achievement's parent project
                 // card instead, only when both the parent Seed/project and
                 // a still-published Achievement are confirmed to exist;
@@ -215,7 +234,7 @@ export default function FeedPostCard({
             </Link>
           )}
           <Link
-            to="/grove"
+            to={isRecruiterPost ? "/recruiter/grove" : "/grove"}
             className="inline-flex items-center gap-1 text-xs font-medium text-accent-dark transition-colors hover:text-accent"
           >
             View Grove

@@ -178,6 +178,22 @@ export async function listPublishedJobs(): Promise<Job[]> {
   return (data ?? []) as Job[];
 }
 
+// A single recruiter's published jobs, for the Recruiter Grove's "Posted
+// Jobs" section (both owner and public views — RLS already scopes this to
+// published-only for any caller other than the owner reading their own
+// full listJobs()).
+export async function listPublishedJobsByRecruiter(recruiterId: string): Promise<Job[]> {
+  const { data, error } = await supabase
+    .from("jobs")
+    .select("*")
+    .eq("recruiter_id", recruiterId)
+    .eq("status", "published")
+    .order("created_at", { ascending: false });
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as Job[];
+}
+
 export async function getPublishedJob(jobId: string): Promise<Job | null> {
   const { data, error } = await supabase
     .from("jobs")

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, ArrowUpRight, MapPin } from "lucide-react";
+import { useAuth } from "../auth/useAuth";
 import { getPublishedJob, getRecruiterProfilePublic } from "../recruiter/recruiterStore";
 import type { EmploymentType, Job, RecruiterProfilePublic, WorkMode } from "../recruiter/types";
 
@@ -24,6 +25,11 @@ const EMPLOYMENT_TYPE_LABEL: Record<EmploymentType, string> = {
 // application. See opportunities_matching.sql's header comment.
 export default function JobDetail() {
   const { jobId } = useParams<{ jobId: string }>();
+  // Registered under both AuthenticatedLayout and RecruiterLayout (see
+  // App.tsx) — a recruiter viewing this via a Grove's Posted Jobs section
+  // needs "Back" to go somewhere their own layout won't bounce them from.
+  const { profile } = useAuth();
+  const isRecruiterViewer = profile?.account_type === "recruiter";
   const [job, setJob] = useState<Job | null | undefined>(undefined);
   const [company, setCompany] = useState<RecruiterProfilePublic | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -56,11 +62,11 @@ export default function JobDetail() {
   return (
     <main className="mx-auto w-full max-w-3xl px-6 py-10">
       <Link
-        to="/opportunities"
+        to={isRecruiterViewer ? "/recruiter/feed" : "/opportunities"}
         className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-soft transition-colors hover:text-ink"
       >
         <ArrowLeft className="h-4 w-4" strokeWidth={2} />
-        Back to Opportunities
+        {isRecruiterViewer ? "Back" : "Back to Opportunities"}
       </Link>
 
       {job === undefined && (

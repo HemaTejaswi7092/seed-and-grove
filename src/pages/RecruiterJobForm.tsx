@@ -1,8 +1,10 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { Sparkles } from "lucide-react";
 import { useAuth } from "../auth/useAuth";
 import { getJob, createJob, updateJob } from "../recruiter/recruiterStore";
 import { parseCommaList } from "../recruiter/parseCommaList";
+import { generateJobDescription } from "../services/ai/generateRecruiterContent";
 import type { EmploymentType, JobInput, JobStatus, WorkMode } from "../recruiter/types";
 
 const inputClasses =
@@ -30,8 +32,10 @@ const STATUS_OPTIONS: { value: JobStatus; label: string }[] = [
 
 // One page handles both Create and Edit (mirrors SeedNew.tsx's full-page-
 // form pattern) — presence of :jobId in the route is the only difference.
-// No AI extraction from a pasted description yet — every field is typed
-// in directly.
+// Create mode gets an optional AI-assist panel (generate-recruiter-content
+// Edge Function) that pre-fills the fields below; every generated field
+// stays fully editable before Post — "AI drafts, human confirms," same
+// philosophy as the achievement-draft flow.
 export default function RecruiterJobForm() {
   const { jobId } = useParams<{ jobId?: string }>();
   const isEditMode = !!jobId;
@@ -54,6 +58,10 @@ export default function RecruiterJobForm() {
   const [loading, setLoading] = useState(isEditMode);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isEditMode || !user || !jobId) return;
@@ -91,6 +99,34 @@ export default function RecruiterJobForm() {
   }, [isEditMode, user, jobId, navigate]);
 
   if (!user) return null;
+
+  async function handleGenerate() {
+    if (!aiPrompt.trim()) return;
+    setGenerating(true);
+    setGenerateError(null);
+    try {
+      const draft = await generateJobDescription(aiPrompt.trim());
+      setTitle(draft.jobTitle);
+      const sections = [draft.summary];
+      if (draft.responsibilities.length > 0) {
+        sections.push(
+          ["Responsibilities:", ...draft.responsibilities.map((item) => `- ${item}`)].join("\n"),
+        );
+      }
+      if (draft.qualifications.length > 0) {
+        sections.push(
+          ["Qualifications:", ...draft.qualifications.map((item) => `- ${item}`)].join("\n"),
+        );
+      }
+      setDescription(sections.join("\n\n"));
+      setRequiredSkills(draft.requiredSkills.join(", "));
+      setPreferredSkills(draft.preferredSkills.join(", "));
+    } catch (err) {
+      setGenerateError(err instanceof Error ? err.message : "Couldn't generate a draft.");
+    } finally {
+      setGenerating(false);
+    }
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -153,6 +189,40 @@ export default function RecruiterJobForm() {
         className="mt-8 rounded-2xl border border-border bg-canvas-elevated p-6 sm:p-8"
       >
         <div className="space-y-5">
+          {!isEditMode && (
+            <div className="rounded-2xl border border-accent-soft-border bg-accent-soft p-5">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-accent" strokeWidth={2.25} />
+                <p className="text-sm font-semibold text-ink">Generate with AI</p>
+              </div>
+              <label htmlFor="job-ai-prompt" className="mt-3 block text-sm font-medium text-ink">
+                What do you need?
+              </label>
+              <textarea
+                id="job-ai-prompt"
+                rows={2}
+                value={aiPrompt}
+                onChange={(event) => setAiPrompt(event.target.value)}
+                placeholder="e.g. We need a junior Data Analyst with SQL, Power BI, and healthcare experience."
+                className={`mt-2 resize-none bg-canvas-elevated ${inputClasses}`}
+              />
+              <button
+                type="button"
+                onClick={handleGenerate}
+                disabled={generating || !aiPrompt.trim()}
+                className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-accent px-4 py-2 text-xs font-medium text-white shadow-sm shadow-accent/20 transition-colors hover:bg-accent-dark disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {generating ? "Generating…" : "Generate with AI"}
+              </button>
+              {generateError && (
+                <p className="mt-2 text-xs text-red-600">{generateError}</p>
+              )}
+              <p className="mt-2 text-xs text-ink-faint">
+                Fills in the fields below — review and edit before posting.
+              </p>
+            </div>
+          )}
+
           <div>
             <label htmlFor="job-title" className="block text-sm font-medium text-ink">
               Title

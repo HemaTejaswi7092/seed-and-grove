@@ -475,6 +475,7 @@ export const demoFeedPosts: FeedPost[] = [
     caption:
       "Cut inference latency 3.5x by redesigning the frame queue as a lock-free ring buffer.",
     author_name: "",
+    author_account_type: "candidate",
     project_title: "VISIQ",
     achievement_title: null,
     evidence_summary:
@@ -493,6 +494,7 @@ export const demoFeedPosts: FeedPost[] = [
     caption:
       "Finally traced that memory leak — turned out to be unreleased CUDA buffers in the async decode path.",
     author_name: "",
+    author_account_type: "candidate",
     project_title: "VISIQ",
     achievement_title: null,
     evidence_summary:
@@ -511,6 +513,7 @@ export const demoFeedPosts: FeedPost[] = [
     caption:
       "Chose edge deployment over cloud inference after modeling the latency and cost tradeoffs — written up as an ADR.",
     author_name: "",
+    author_account_type: "candidate",
     project_title: "VISIQ",
     achievement_title: null,
     evidence_summary:
@@ -528,6 +531,7 @@ export const demoFeedPosts: FeedPost[] = [
     post_type: "project_started",
     caption: "Started building VISIQ — real-time defect detection for manufacturing.",
     author_name: "",
+    author_account_type: "candidate",
     project_title: "VISIQ",
     achievement_title: null,
     evidence_summary: null,

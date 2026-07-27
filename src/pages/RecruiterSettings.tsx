@@ -10,8 +10,11 @@ const inputClasses =
 
 type SectionStatus = "idle" | "saving" | "error";
 
-// Not an ATS settings page — three plain sections (Account, Company,
-// Security), no hiring-workflow configuration of any kind.
+// Not an ATS settings page — two plain sections (Account, Security).
+// Professional-identity fields (title, company info, hiring interests,
+// experience, etc.) live exclusively in Recruiter Grove's own editor
+// (RecruiterGroveEditor.tsx, at /recruiter/grove/edit) — see this
+// session's ownership-model instructions for why they don't belong here.
 export default function RecruiterSettings() {
   const { user, profile, updateFullName, updatePassword, resetPasswordForEmail, signOut } =
     useAuth();
@@ -20,16 +23,8 @@ export default function RecruiterSettings() {
 
   const [fullName, setFullName] = useState("");
   const [workEmail, setWorkEmail] = useState("");
-  const [jobTitle, setJobTitle] = useState("");
   const [accountStatus, setAccountStatus] = useState<SectionStatus>("idle");
   const [accountError, setAccountError] = useState<string | null>(null);
-
-  const [companyName, setCompanyName] = useState("");
-  const [companyWebsite, setCompanyWebsite] = useState("");
-  const [companyLocation, setCompanyLocation] = useState("");
-  const [companyLogoUrl, setCompanyLogoUrl] = useState("");
-  const [companyStatus, setCompanyStatus] = useState<SectionStatus>("idle");
-  const [companyError, setCompanyError] = useState<string | null>(null);
 
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -60,11 +55,6 @@ export default function RecruiterSettings() {
     Promise.resolve().then(() => {
       if (cancelled) return;
       setWorkEmail(recruiterProfile.work_email);
-      setJobTitle(recruiterProfile.job_title);
-      setCompanyName(recruiterProfile.company_name);
-      setCompanyWebsite(recruiterProfile.company_website ?? "");
-      setCompanyLocation(recruiterProfile.company_location ?? "");
-      setCompanyLogoUrl(recruiterProfile.company_logo_url ?? "");
     });
     return () => {
       cancelled = true;
@@ -87,7 +77,6 @@ export default function RecruiterSettings() {
       await updateFullName(fullName.trim());
       await updateRecruiterProfile(user!.id, {
         work_email: workEmail.trim(),
-        job_title: jobTitle.trim(),
       });
       refresh();
       setAccountStatus("idle");
@@ -95,27 +84,6 @@ export default function RecruiterSettings() {
     } catch (err) {
       setAccountStatus("error");
       setAccountError(err instanceof Error ? err.message : "Couldn't save changes.");
-    }
-  }
-
-  async function handleSaveCompany(event: FormEvent) {
-    event.preventDefault();
-    if (companyStatus === "saving") return;
-    setCompanyStatus("saving");
-    setCompanyError(null);
-    try {
-      await updateRecruiterProfile(user!.id, {
-        company_name: companyName.trim(),
-        company_website: companyWebsite.trim() || null,
-        company_location: companyLocation.trim() || null,
-        company_logo_url: companyLogoUrl.trim() || null,
-      });
-      refresh();
-      setCompanyStatus("idle");
-      showToast("Company updated");
-    } catch (err) {
-      setCompanyStatus("error");
-      setCompanyError(err instanceof Error ? err.message : "Couldn't save changes.");
     }
   }
 
@@ -159,7 +127,7 @@ export default function RecruiterSettings() {
   return (
     <main className="mx-auto w-full max-w-2xl px-6 py-10">
       <h1 className="text-2xl font-semibold tracking-tight text-ink">Settings</h1>
-      <p className="mt-2 text-ink-soft">Manage your account, company, and security.</p>
+      <p className="mt-2 text-ink-soft">Manage your account and security.</p>
 
       {loading ? (
         <div className="mt-8 flex items-center justify-center rounded-2xl border border-dashed border-ink-faint/40 bg-canvas-elevated px-6 py-16">
@@ -195,17 +163,6 @@ export default function RecruiterSettings() {
                 onChange={(e) => setWorkEmail(e.target.value)}
               />
             </label>
-            <label className="block">
-              <span className="text-xs font-medium tracking-wide text-ink-faint uppercase">
-                Recruiter title
-              </span>
-              <input
-                className={`mt-1.5 ${inputClasses}`}
-                placeholder="e.g. Technical Recruiter"
-                value={jobTitle}
-                onChange={(e) => setJobTitle(e.target.value)}
-              />
-            </label>
             {accountStatus === "error" && accountError && (
               <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
                 {accountError}
@@ -218,75 +175,6 @@ export default function RecruiterSettings() {
                 className="rounded-full bg-accent px-6 py-2.5 text-sm font-medium text-white shadow-sm shadow-accent/20 transition-colors hover:bg-accent-dark disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {accountStatus === "saving" ? "Saving…" : "Save changes"}
-              </button>
-            </div>
-          </form>
-
-          <form
-            onSubmit={handleSaveCompany}
-            className="space-y-5 rounded-2xl border border-border bg-canvas-elevated p-6 sm:p-8"
-          >
-            <p className="text-xs font-semibold tracking-wide text-accent-dark uppercase">
-              Company
-            </p>
-            <label className="block">
-              <span className="text-xs font-medium tracking-wide text-ink-faint uppercase">
-                Company name
-              </span>
-              <input
-                className={`mt-1.5 ${inputClasses}`}
-                value={companyName}
-                onChange={(e) => setCompanyName(e.target.value)}
-              />
-            </label>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <label className="block">
-                <span className="text-xs font-medium tracking-wide text-ink-faint uppercase">
-                  Website
-                </span>
-                <input
-                  type="url"
-                  className={`mt-1.5 ${inputClasses}`}
-                  placeholder="https://..."
-                  value={companyWebsite}
-                  onChange={(e) => setCompanyWebsite(e.target.value)}
-                />
-              </label>
-              <label className="block">
-                <span className="text-xs font-medium tracking-wide text-ink-faint uppercase">
-                  Location
-                </span>
-                <input
-                  className={`mt-1.5 ${inputClasses}`}
-                  value={companyLocation}
-                  onChange={(e) => setCompanyLocation(e.target.value)}
-                />
-              </label>
-            </div>
-            <label className="block">
-              <span className="text-xs font-medium tracking-wide text-ink-faint uppercase">
-                Logo URL
-              </span>
-              <input
-                type="url"
-                className={`mt-1.5 ${inputClasses}`}
-                placeholder="https://..."
-                value={companyLogoUrl}
-                onChange={(e) => setCompanyLogoUrl(e.target.value)}
-              />
-            </label>
-            {companyStatus === "error" && companyError && (
-              <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-                {companyError}
-              </p>
-            )}
-            <div className="flex justify-end border-t border-border pt-5">
-              <button
-                type="submit"
-                disabled={companyStatus === "saving"}
-                className="rounded-full bg-accent px-6 py-2.5 text-sm font-medium text-white shadow-sm shadow-accent/20 transition-colors hover:bg-accent-dark disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {companyStatus === "saving" ? "Saving…" : "Save changes"}
               </button>
             </div>
           </form>

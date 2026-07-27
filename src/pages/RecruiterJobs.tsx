@@ -87,7 +87,7 @@ export default function RecruiterJobs() {
             to="/recruiter/jobs/new"
             className="inline-flex shrink-0 items-center gap-2 rounded-full bg-accent px-5 py-2.5 text-sm font-medium text-white shadow-sm shadow-accent/20 transition-colors hover:bg-accent-dark"
           >
-            Post a Job
+            Create Job
           </Link>
         )}
       </div>
@@ -117,7 +117,7 @@ export default function RecruiterJobs() {
             to="/recruiter/jobs/new"
             className="mt-7 inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3 text-sm font-medium text-white shadow-sm shadow-accent/20 transition-colors hover:bg-accent-dark"
           >
-            Post a Job
+            Create Job
           </Link>
         </div>
       ) : (

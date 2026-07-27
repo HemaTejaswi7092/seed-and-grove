@@ -65,7 +65,7 @@ export default function RecruiterCandidateProfile() {
     };
   }, [candidateId]);
 
-  if (!candidateId) return <Navigate to="/recruiter/discover" replace />;
+  if (!candidateId) return <Navigate to="/recruiter/feed" replace />;
 
   if (error) {
     return (

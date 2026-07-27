@@ -6,14 +6,17 @@ import { useAuth } from "../auth/useAuth";
 import { getInitials } from "../lib/initials";
 import { getDisplayName } from "../lib/displayName";
 
-// Deliberately no Seed or Grove links — recruiters never see candidate
-// creation pages. No Shortlists/pipeline items — this is not an ATS.
-// Candidate discovery lives under Discover (feed + candidate profiles),
-// not as a standalone "Candidates" destination.
+// "Seed" is the recruiter's private workspace (still served at the
+// /recruiter/dashboard URL — only the nav label changed, see App.tsx's
+// comment on why), "Grove" their public professional profile, "Feed" the
+// shared candidate+recruiter activity stream. No Shortlists/pipeline
+// items — this is not an ATS. Candidate discovery lives in the Feed +
+// per-job matching, not as a standalone "Candidates" destination.
 const links = [
-  { label: "Dashboard", to: "/recruiter/dashboard" },
+  { label: "Seed", to: "/recruiter/dashboard" },
   { label: "Jobs", to: "/recruiter/jobs" },
-  { label: "Discover", to: "/recruiter/discover" },
+  { label: "Feed", to: "/recruiter/feed" },
+  { label: "Grove", to: "/recruiter/grove" },
   { label: "Settings", to: "/recruiter/settings" },
 ];
 

@@ -364,6 +364,7 @@ export default function Seed() {
       post_type: shareState.postType,
       caption: input.caption,
       author_name: getDisplayName(currentUser, profile) || "A builder",
+      author_account_type: "candidate",
       project_title: shareState.projectTitle,
       achievement_title: shareState.achievementTitle,
       evidence_summary: shareState.evidenceSummary,

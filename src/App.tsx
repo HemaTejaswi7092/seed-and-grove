@@ -21,7 +21,11 @@ import RecruiterDashboard from "./pages/RecruiterDashboard";
 import RecruiterJobs from "./pages/RecruiterJobs";
 import RecruiterJobForm from "./pages/RecruiterJobForm";
 import RecruiterSettings from "./pages/RecruiterSettings";
-import RecruiterDiscover from "./pages/RecruiterDiscover";
+import RecruiterFeed from "./pages/RecruiterFeed";
+import RecruiterGrove from "./pages/RecruiterGrove";
+import RecruiterGroveEditor from "./pages/RecruiterGroveEditor";
+import PublicRecruiterProfile from "./pages/PublicRecruiterProfile";
+import RecruiterPostComposer from "./pages/RecruiterPostComposer";
 import RecruiterCandidateProfile from "./pages/RecruiterCandidateProfile";
 import RecruiterJobMatches from "./pages/RecruiterJobMatches";
 
@@ -78,17 +82,34 @@ function App() {
             path="/candidates/:candidateId/preview"
             element={<RecruiterCandidateProfile />}
           />
+          {/* Same reuse pattern as RecruiterCandidateProfile above — one
+              read-only Recruiter Grove component, rendered under whichever
+              gated layout the current viewer belongs to (see
+              FeedPostCard's viewerAccountType comment for why both are
+              needed). */}
+          <Route path="/recruiters/:recruiterId" element={<PublicRecruiterProfile />} />
         </Route>
 
-        {/* Recruiter-side counterpart — no Seed, no Grove, no candidate
-            feed. Candidates are redirected away (see RecruiterLayout). */}
+        {/* Recruiter-side counterpart — no candidate Seed/Grove creation.
+            Candidates are redirected away (see RecruiterLayout). Seed,
+            Grove, and Feed are now real recruiter destinations too — see
+            RecruiterDashboard/RecruiterGrove/RecruiterFeed. */}
         <Route element={<RecruiterLayout />}>
           <Route path="/recruiter/dashboard" element={<RecruiterDashboard />} />
           <Route path="/recruiter/jobs" element={<RecruiterJobs />} />
           <Route path="/recruiter/jobs/new" element={<RecruiterJobForm />} />
           <Route path="/recruiter/jobs/:jobId/edit" element={<RecruiterJobForm />} />
           <Route path="/recruiter/jobs/:jobId/matches" element={<RecruiterJobMatches />} />
-          <Route path="/recruiter/discover" element={<RecruiterDiscover />} />
+          <Route path="/recruiter/feed" element={<RecruiterFeed />} />
+          <Route path="/recruiter/grove" element={<RecruiterGrove />} />
+          <Route path="/recruiter/grove/edit" element={<RecruiterGroveEditor />} />
+          <Route path="/recruiter/recruiters/:recruiterId" element={<PublicRecruiterProfile />} />
+          {/* Same JobDetail component as /opportunities/:jobId (candidate
+              side) — reused here so Recruiter Grove's Posted Jobs section
+              can link to one public job detail page regardless of viewer
+              type (see RecruiterGroveView's jobDetailBase). */}
+          <Route path="/recruiter/opportunities/:jobId" element={<JobDetail />} />
+          <Route path="/recruiter/posts/new" element={<RecruiterPostComposer />} />
           <Route
             path="/recruiter/candidates/:candidateId"
             element={<RecruiterCandidateProfile />}
