@@ -196,7 +196,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // For someone who can't sign in at all (forgot their password) — sends
   // a reset-link email; distinct from updatePassword above, which is for
-  // an already-signed-in user changing their password from Settings.
+  // an already-signed-in user changing their password from Profile.
   async function resetPasswordForEmail(email: string) {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/auth/callback`,

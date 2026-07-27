@@ -74,3 +74,23 @@ export interface CopilotResponse {
   // "api" mode only — see above.
   retrievedContext?: RetrievedContextItem[];
 }
+
+// Fired automatically when a Seed is marked complete (see Seed.tsx's
+// handleConfirmComplete) — same context a chat turn would carry, minus
+// the message itself, since this isn't conversational.
+export interface AchievementDraftRequest {
+  seed: Seed;
+  recentMessages: SeedConversationMessage[];
+  activity: SeedActivityItem[];
+  achievements: Achievement[];
+}
+
+// An empty `suggestions` array is a normal, expected outcome (nothing new
+// beyond what's already logged) — never treated as an error by the
+// caller. Each suggestion reuses EvidenceSuggestion's shape so it can go
+// straight through the same review-form mapping the chat flow already
+// uses (see lib/evidenceSuggestion.ts).
+export interface AchievementDraftResult {
+  reason: string;
+  suggestions: EvidenceSuggestion[];
+}

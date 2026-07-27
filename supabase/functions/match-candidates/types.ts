@@ -50,6 +50,7 @@ export interface CandidateMatchResult {
   name: string;
   headline: string;
   matchScore: number; // 0-100
+  matchLabel: string; // "Excellent Match" | "Strong Match" | "Good Match" | "Potential Match" — see ../_shared/matching.ts
   matchSentence: string;
   achievements: MatchedAchievement[];
 }

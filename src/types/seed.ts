@@ -61,6 +61,38 @@ export interface SeedActivityItem {
   createdAt: string;
 }
 
+// The Timeline tab's entire data source — meaningful, system-recognized
+// project events only, each logged automatically at the single choke
+// point that already performs that action (see state/seedStore.ts,
+// state/achievements.ts, components/workspace/CopilotChat.tsx). Never
+// written from a chat message, a tab open, or any other passive/manual
+// signal — deliberately a much narrower list than SeedActivityItem
+// above, which exists for a different purpose (feeding the AI Copilot's
+// own context, not for display).
+export type TimelineEventType =
+  | "project_created"
+  | "details_updated"
+  | "ai_plan_generated"
+  | "repo_linked"
+  | "demo_linked"
+  | "milestone_completed"
+  | "achievement_created"
+  | "achievement_published"
+  | "project_published"
+  | "project_completed"
+  | "project_reopened";
+
+export interface TimelineEvent {
+  id: string;
+  seedId: string;
+  type: TimelineEventType;
+  // Optional short specific — e.g. an achievement's title — shown
+  // alongside the event type's generic label. null when the event type
+  // is already fully self-explanatory (e.g. "Project created").
+  detail: string | null;
+  createdAt: string;
+}
+
 // Suggested achievement types. "achievement" itself was deliberately
 // dropped from this list — the record itself is now called an Achievement,
 // so a type value of "achievement" would be redundant; "award" covers that

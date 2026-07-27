@@ -1,1 +1,1 @@
-export type WorkspaceTab = "workspace" | "activity" | "evidence";
+export type WorkspaceTab = "workspace" | "timeline" | "evidence";

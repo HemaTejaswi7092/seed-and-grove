@@ -6,6 +6,7 @@
 // both state/seedStore.ts (local) and state/groveAchievementsStore.ts
 // (Postgres).
 import {
+  addTimelineEvent,
   createSeedAchievement,
   deleteSeedAchievement,
   getAchievement,
@@ -19,7 +20,7 @@ import {
   type UpsertPublishedAchievementInput,
 } from "./groveAchievementsStore";
 import { buildAchievementEmbeddingText } from "../lib/achievementEmbeddingText";
-import { embedAchievementText } from "../services/ai/embedAchievement";
+import { embedText } from "../services/ai/embedText";
 import type { Achievement } from "../types/seed";
 
 // Re-embeds on every publish/update — the cheapest correct option, since
@@ -47,7 +48,7 @@ async function toPublishedInput(
     relevant_roles: achievement.relevantRoles,
   };
 
-  const embedding = await embedAchievementText(buildAchievementEmbeddingText(achievement));
+  const embedding = await embedText(buildAchievementEmbeddingText(achievement));
   if (!embedding) return base;
 
   return {
@@ -68,8 +69,18 @@ export async function createAchievement(
   input: CreateAchievementInput,
 ): Promise<Achievement> {
   const achievement = createSeedAchievement(userId, seedId, input);
+  // "Milestone" is one specific achievementType among several (see
+  // ACHIEVEMENT_TYPES) — it gets the more specific Timeline label
+  // ("Milestone completed"), everything else gets the general one.
+  addTimelineEvent(
+    userId,
+    seedId,
+    achievement.achievementType === "milestone" ? "milestone_completed" : "achievement_created",
+    achievement.title,
+  );
   if (achievement.visibility === "published") {
     await upsertPublishedAchievement(userId, await toPublishedInput(achievement));
+    addTimelineEvent(userId, seedId, "achievement_published", achievement.title);
   }
   return achievement;
 }
@@ -84,11 +95,18 @@ export async function updateAchievement(
   achievementId: string,
   patch: UpdateAchievementInput,
 ): Promise<Achievement | null> {
+  const before = getAchievement(userId, achievementId);
   const updated = updateSeedAchievement(userId, achievementId, patch);
   if (!updated) return null;
 
   if (updated.visibility === "published") {
     await upsertPublishedAchievement(userId, await toPublishedInput(updated));
+    // Only the private→published transition is Timeline-worthy — every
+    // other edit (title, description, ...) is exactly the "minor edit"
+    // the Timeline spec says not to record.
+    if (before && before.visibility !== "published") {
+      addTimelineEvent(userId, updated.seedId, "achievement_published", updated.title);
+    }
   } else {
     await deletePublishedAchievement(updated.id);
   }

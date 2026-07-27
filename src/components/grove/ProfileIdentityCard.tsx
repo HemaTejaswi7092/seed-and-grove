@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   MapPin,
@@ -23,14 +24,13 @@ interface ProfileIdentityCardProps {
   initials: string;
   avatarUrl?: string;
   headline: string;
-  bio: string;
   location: string;
   availability: string;
   stats: ProfileStat[];
   // Fast-scan "can I reach/hire this person" facts — deliberately kept to
   // badges + a link row rather than paragraphs, so the hero stays a
-  // 5-second read (see the About block, rendered separately below this
-  // card, for the narrative version of "who this person is").
+  // 5-second read (see the About section, rendered separately below this
+  // card, for the professional summary version of "who this person is").
   openToOpportunities: boolean;
   workMode: string;
   contactVisible: boolean;
@@ -44,7 +44,6 @@ interface ProfileIdentityCardProps {
   isPreview: boolean;
   onTogglePreview: () => void;
   onShare: () => void;
-  onEdit: () => void;
 }
 
 export default function ProfileIdentityCard({
@@ -52,7 +51,6 @@ export default function ProfileIdentityCard({
   initials,
   avatarUrl,
   headline,
-  bio,
   location,
   availability,
   stats,
@@ -69,7 +67,6 @@ export default function ProfileIdentityCard({
   isPreview,
   onTogglePreview,
   onShare,
-  onEdit,
 }: ProfileIdentityCardProps) {
   const links = [
     { label: "Resume", href: resumeUrl, icon: FileText },
@@ -108,12 +105,7 @@ export default function ProfileIdentityCard({
                 {headline}
               </p>
             )}
-            {bio && (
-              <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-ink-soft">
-                &ldquo;{bio}&rdquo;
-              </p>
-            )}
-            <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-ink-faint">
+            <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-ink-faint">
               {location && (
                 <span className="inline-flex items-center gap-1.5">
                   <MapPin className="h-3.5 w-3.5" strokeWidth={2} />
@@ -191,14 +183,13 @@ export default function ProfileIdentityCard({
               Share
             </button>
             {!isPreview && (
-              <button
-                type="button"
-                onClick={onEdit}
+              <Link
+                to="/profile"
                 className="inline-flex items-center justify-center gap-1.5 rounded-full bg-accent px-4 py-2 text-xs font-medium text-white shadow-sm shadow-accent/20 transition-colors hover:bg-accent-dark"
               >
                 <Pencil className="h-3.5 w-3.5" strokeWidth={2} />
-                Edit Grove
-              </button>
+                Edit Profile
+              </Link>
             )}
           </div>
         )}

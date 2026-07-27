@@ -43,6 +43,7 @@ export default function RecruiterJobForm() {
   const [employmentType, setEmploymentType] = useState<EmploymentType>("full_time");
   const [workMode, setWorkMode] = useState<WorkMode>("remote");
   const [description, setDescription] = useState("");
+  const [applicationUrl, setApplicationUrl] = useState("");
   const [requiredSkills, setRequiredSkills] = useState("");
   const [preferredSkills, setPreferredSkills] = useState("");
   const [experienceLevel, setExperienceLevel] = useState("");
@@ -69,6 +70,7 @@ export default function RecruiterJobForm() {
         setEmploymentType(job.employment_type);
         setWorkMode(job.work_mode);
         setDescription(job.description);
+        setApplicationUrl(job.application_url);
         setRequiredSkills(job.required_skills.join(", "));
         setPreferredSkills(job.preferred_skills.join(", "));
         setExperienceLevel(job.experience_level ?? "");
@@ -102,6 +104,7 @@ export default function RecruiterJobForm() {
       employment_type: employmentType,
       work_mode: workMode,
       description: description.trim(),
+      application_url: applicationUrl.trim(),
       required_skills: parseCommaList(requiredSkills),
       preferred_skills: parseCommaList(preferredSkills),
       experience_level: experienceLevel.trim() || null,
@@ -248,6 +251,25 @@ export default function RecruiterJobForm() {
               placeholder="What this role owns, and what a great first six months looks like."
               className={`mt-2 resize-none ${inputClasses}`}
             />
+          </div>
+
+          <div>
+            <label htmlFor="job-application-url" className="block text-sm font-medium text-ink">
+              Application URL
+            </label>
+            <input
+              id="job-application-url"
+              type="url"
+              required
+              value={applicationUrl}
+              onChange={(event) => setApplicationUrl(event.target.value)}
+              placeholder="https://yourcompany.com/careers/senior-backend-engineer"
+              className={`mt-2 ${inputClasses}`}
+            />
+            <p className="mt-1.5 text-xs text-ink-faint">
+              Candidates apply on your own site — Seed &amp; Grove links out to this URL and never
+              collects applications itself.
+            </p>
           </div>
 
           <div>

@@ -8,6 +8,8 @@ import type {
   SeedActivityItem,
   SeedConversationMessage,
   SeedStage,
+  TimelineEvent,
+  TimelineEventType,
 } from "../types/seed";
 
 // Temporary local persistence layer — Seeds and their achievements aren't
@@ -27,6 +29,7 @@ interface UserSeedData {
   activity: SeedActivityItem[];
   achievements: Achievement[];
   messages: SeedConversationMessage[];
+  timeline: TimelineEvent[];
 }
 
 const EMPTY_DATA: UserSeedData = {
@@ -34,6 +37,7 @@ const EMPTY_DATA: UserSeedData = {
   activity: [],
   achievements: [],
   messages: [],
+  timeline: [],
 };
 
 const stageToStatus: Record<SeedStage, string> = {
@@ -107,6 +111,7 @@ function load(userId: string): UserSeedData {
         backfillAchievement,
       ),
       messages: parsed.messages ?? [],
+      timeline: parsed.timeline ?? [],
     };
   } catch {
     return { ...EMPTY_DATA };
@@ -123,6 +128,30 @@ function save(userId: string, data: UserSeedData): void {
 
 function generateId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+// Pushes onto an already-`load()`ed data object without its own save() —
+// every call site below is already mid-mutation inside one of this
+// file's writers and calls save(userId, data) itself once, afterward.
+// Keeps a project-lifecycle event and the write that caused it in the
+// same localStorage transaction instead of a separate read/write
+// round-trip. See addTimelineEvent below for the standalone version
+// other files (state/achievements.ts, CopilotChat.tsx) use.
+function pushTimelineEvent(
+  data: UserSeedData,
+  seedId: string,
+  type: TimelineEventType,
+  detail?: string,
+): TimelineEvent {
+  const event: TimelineEvent = {
+    id: generateId("timeline"),
+    seedId,
+    type,
+    detail: detail ?? null,
+    createdAt: new Date().toISOString(),
+  };
+  data.timeline.push(event);
+  return event;
 }
 
 function welcomeMessageFor(seed: Seed): SeedConversationMessage {
@@ -261,6 +290,7 @@ function createSeedRecord(
   };
   data.seeds.push(seed);
   data.messages.push(welcomeMessageFor(seed));
+  pushTimelineEvent(data, seed.id, "project_created");
   save(userId, data);
   return seed;
 }
@@ -311,6 +341,25 @@ export function addSeedActivity(
   data.activity.push(item);
   save(userId, data);
   return item;
+}
+
+// Standalone version of pushTimelineEvent, for callers outside this file
+// that don't already have a load()ed UserSeedData to append to (see
+// state/achievements.ts, CopilotChat.tsx).
+export function addTimelineEvent(
+  userId: string,
+  seedId: string,
+  type: TimelineEventType,
+  detail?: string,
+): TimelineEvent {
+  const data = load(userId);
+  const event = pushTimelineEvent(data, seedId, type, detail);
+  save(userId, data);
+  return event;
+}
+
+export function getSeedTimeline(userId: string, seedId: string): TimelineEvent[] {
+  return load(userId).timeline.filter((item) => item.seedId === seedId);
 }
 
 // --- Achievements (local half — see state/achievements.ts for the public,
@@ -425,10 +474,16 @@ export function setSeedPublished(
   const data = load(userId);
   const seed = data.seeds.find((item) => item.id === seedId);
   if (!seed) return null;
+  const wasPublished = seed.isPublished;
   const now = new Date().toISOString();
   seed.isPublished = isPublished;
   seed.publishedAt = isPublished ? now : null;
   seed.updatedAt = now;
+  // Only the private→published transition is a Timeline-worthy moment —
+  // unpublishing isn't in the recorded event list (see types/seed.ts).
+  if (isPublished && !wasPublished) {
+    pushTimelineEvent(data, seed.id, "project_published");
+  }
   save(userId, data);
   return seed;
 }
@@ -445,9 +500,16 @@ export function updateSeedLinks(
   const data = load(userId);
   const seed = data.seeds.find((item) => item.id === seedId);
   if (!seed) return null;
+  const hadRepo = Boolean(seed.repoUrl);
+  const hadDemo = Boolean(seed.demoUrl);
   seed.repoUrl = links.repoUrl.trim();
   seed.demoUrl = links.demoUrl.trim();
   seed.updatedAt = new Date().toISOString();
+  // Only the empty→filled transition for each link is Timeline-worthy —
+  // editing an already-set link is exactly the "minor edit" the Timeline
+  // spec says not to record.
+  if (!hadRepo && seed.repoUrl) pushTimelineEvent(data, seed.id, "repo_linked");
+  if (!hadDemo && seed.demoUrl) pushTimelineEvent(data, seed.id, "demo_linked");
   save(userId, data);
   return seed;
 }
@@ -468,6 +530,7 @@ export function completeSeed(userId: string, seedId: string): Seed | null {
   seed.lifecycleStatus = "completed";
   seed.completedAt = now;
   seed.updatedAt = now;
+  pushTimelineEvent(data, seed.id, "project_completed");
   save(userId, data);
   return seed;
 }
@@ -479,6 +542,7 @@ export function reopenSeed(userId: string, seedId: string): Seed | null {
   seed.lifecycleStatus = "in_progress";
   seed.completedAt = null;
   seed.updatedAt = new Date().toISOString();
+  pushTimelineEvent(data, seed.id, "project_reopened");
   save(userId, data);
   return seed;
 }

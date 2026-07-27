@@ -3,11 +3,11 @@ import { motion } from "framer-motion";
 import { TreeDeciduous, Eye, Pencil } from "lucide-react";
 
 interface GroveEmptyStateProps {
-  onEdit: () => void;
+  isOwner: boolean;
   onPreview: () => void;
 }
 
-export default function GroveEmptyState({ onEdit, onPreview }: GroveEmptyStateProps) {
+export default function GroveEmptyState({ isOwner, onPreview }: GroveEmptyStateProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -26,30 +26,31 @@ export default function GroveEmptyState({ onEdit, onPreview }: GroveEmptyStatePr
         on demonstrated experience instead of self-reported skills.
       </p>
 
-      <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
-        <Link
-          to="/seeds"
-          className="inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3 text-sm font-medium text-white shadow-sm shadow-accent/20 transition-colors hover:bg-accent-dark"
-        >
-          View My Seeds
-        </Link>
-        <button
-          type="button"
-          onClick={onEdit}
-          className="inline-flex items-center gap-2 rounded-full border border-border bg-canvas-elevated px-6 py-3 text-sm font-medium text-ink transition-colors hover:border-ink-faint"
-        >
-          <Pencil className="h-4 w-4" strokeWidth={2} />
-          Edit Grove
-        </button>
-        <button
-          type="button"
-          onClick={onPreview}
-          className="inline-flex items-center gap-2 rounded-full border border-border bg-canvas-elevated px-6 py-3 text-sm font-medium text-ink transition-colors hover:border-ink-faint"
-        >
-          <Eye className="h-4 w-4" strokeWidth={2} />
-          Preview Public Grove
-        </button>
-      </div>
+      {isOwner && (
+        <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+          <Link
+            to="/seeds"
+            className="inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3 text-sm font-medium text-white shadow-sm shadow-accent/20 transition-colors hover:bg-accent-dark"
+          >
+            View My Seeds
+          </Link>
+          <Link
+            to="/profile"
+            className="inline-flex items-center gap-2 rounded-full border border-border bg-canvas-elevated px-6 py-3 text-sm font-medium text-ink transition-colors hover:border-ink-faint"
+          >
+            <Pencil className="h-4 w-4" strokeWidth={2} />
+            Edit Profile
+          </Link>
+          <button
+            type="button"
+            onClick={onPreview}
+            className="inline-flex items-center gap-2 rounded-full border border-border bg-canvas-elevated px-6 py-3 text-sm font-medium text-ink transition-colors hover:border-ink-faint"
+          >
+            <Eye className="h-4 w-4" strokeWidth={2} />
+            Preview Public Grove
+          </button>
+        </div>
+      )}
     </motion.div>
   );
 }

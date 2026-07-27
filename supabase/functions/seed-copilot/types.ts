@@ -57,7 +57,13 @@ export interface SeedContext {
   progress: number;
 }
 
-// Request body sent by src/services/ai/aiClient.ts.
+// Request body sent by src/services/ai/aiClient.ts. `mode` is optional and
+// defaults to "chat" (the original conversational path) for backward
+// compatibility; "generate_achievement" is the on-demand "Publish
+// Achievement" button (see achievementDraft.ts) — `message` is still
+// required by isValidBody in that mode too, but its content is ignored
+// (the frontend sends a fixed instruction string; the achievement-draft
+// prompt never reads it).
 export interface CopilotRequestBody {
   seedId: string;
   seedContext: SeedContext;
@@ -65,6 +71,7 @@ export interface CopilotRequestBody {
   recentMessages: ChatTurn[];
   activity: ActivityInput[];
   evidence: EvidenceInput[];
+  mode?: "chat" | "generate_achievement";
 }
 
 export interface RetrievedContextItem {
@@ -134,3 +141,39 @@ export interface CopilotResponseBody {
   // for debugging. Never a signal the frontend needs to act on.
   memorySaved?: MemoryCandidate;
 }
+
+// Same field shape as EvidenceCandidate minus `confidence` (meaningless
+// here — this is a deliberate request for credible drafts, not a maybe-
+// signal riding along a chat reply) — see achievementDraft.ts.
+export interface AchievementDraft {
+  title: string;
+  summary: string;
+  category: string;
+  skillsDemonstrated?: string[];
+  technologiesUsed?: string[];
+  projectDomain?: string;
+  relevantRoles?: string[];
+  candidateContribution?: string;
+  outcomeOrImpact?: string;
+}
+
+// What the achievement-draft forced tool call must return. An empty
+// `suggestions` array is a legitimate, expected outcome (nothing new
+// beyond what's already logged) — never treated as an error by index.ts.
+export interface AchievementDraftToolOutput {
+  reason: string;
+  suggestions: AchievementDraft[];
+}
+
+// What this function returns to the frontend when body.mode ===
+// "generate_achievement" — a different shape from CopilotResponseBody
+// (no message/intent/retrievedContext; this mode never chats).
+export interface AchievementDraftResponseBody {
+  reason: string;
+  suggestions: AchievementDraft[];
+}
+
+export type AchievementDraftCallFn = (
+  userTurn: string,
+  config: ProviderCallConfig,
+) => Promise<AchievementDraftToolOutput>;

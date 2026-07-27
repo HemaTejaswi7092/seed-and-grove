@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { Sprout } from "lucide-react";
 import { useAuth } from "../auth/useAuth";
 import { isDemoAccount } from "../config/demoAccount";
@@ -38,20 +37,18 @@ import type {
 
 // Thin data-loading wrapper: this file's only job is deciding *what data*
 // the authenticated user should see (real vs. demo account) and shaping it
-// into GroveView's props. GroveView itself is pure presentation, so a
-// future /grove/:username route can reuse it unchanged — it would just
-// need a loader that resolves a Seed/achievement set by username instead
-// of by the current session, and render with isOwner={false}.
+// into GroveView's props. GroveView itself is pure presentation and
+// strictly read-only — Grove.tsx has no save/edit path of its own; the
+// Profile page (see pages/CandidateProfile.tsx) is the only place
+// profileFields is ever written, aside from the one-time legacy
+// migration below. A future /grove/:username route can reuse GroveView
+// unchanged — it would just need a loader that resolves a Seed/
+// achievement set by username instead of by the current session, and
+// render with isOwner={false}.
 export default function Grove() {
   const { user, profile } = useAuth();
-  const navigate = useNavigate();
   const [previewMode, setPreviewMode] = useState(false);
-  const [editOpen, setEditOpen] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-
-  function goToSettings() {
-    navigate("/settings");
-  }
 
   const isDemo = !!user && isDemoAccount(user.email);
 
@@ -140,16 +137,6 @@ export default function Grove() {
       .catch(() => showToast("Couldn't copy link"));
   }
 
-  // Left to throw on failure — EditGroveModal's own submit handler
-  // catches it, shows the error inline, and keeps the modal open, so a
-  // failed save never reads as a silent success.
-  async function handleSaveProfile(next: GroveProfileFields) {
-    await saveCandidateProfile(currentUser.id, displayName, next);
-    setProfileFields(next);
-    setEditOpen(false);
-    showToast("Grove saved");
-  }
-
   if (isDemo) {
     const strength = calculateGroveStrength({
       hasHeadlineOrBio: true,
@@ -174,12 +161,6 @@ export default function Grove() {
         isPreview={previewMode}
         onTogglePreview={() => setPreviewMode((v) => !v)}
         onShare={handleShare}
-        editOpen={editOpen}
-        onOpenEdit={() => setEditOpen(true)}
-        onCloseEdit={() => setEditOpen(false)}
-        onSaveProfile={handleSaveProfile}
-        onEditProfessionalDetails={goToSettings}
-        readOnlyProfile
         toast={toast}
       />
     );
@@ -254,14 +235,9 @@ export default function Grove() {
     }));
 
   const hasHeadlineOrBio = Boolean(
-    profileFields.headline.trim() || profileFields.bio.trim(),
+    profileFields.headline.trim() || profileFields.professionalSummary.trim(),
   );
-  const hasAboutSection = Boolean(
-    profileFields.about.enjoys.trim() ||
-      profileFields.about.interests.trim() ||
-      profileFields.about.direction.trim() ||
-      profileFields.about.technologies.trim(),
-  );
+  const hasAboutSection = Boolean(profileFields.areasOfInterest.trim());
   const hasAchievementCaptured = allSeeds.some(
     (seed) => getSeedAchievements(currentUser.id, seed.id).length > 0,
   );
@@ -291,12 +267,6 @@ export default function Grove() {
       isPreview={previewMode}
       onTogglePreview={() => setPreviewMode((v) => !v)}
       onShare={handleShare}
-      editOpen={editOpen}
-      onOpenEdit={() => setEditOpen(true)}
-      onCloseEdit={() => setEditOpen(false)}
-      onSaveProfile={handleSaveProfile}
-      onEditProfessionalDetails={goToSettings}
-      readOnlyProfile={false}
       toast={toast}
     />
   );

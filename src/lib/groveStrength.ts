@@ -38,12 +38,12 @@ export function calculateGroveStrength(
     },
     {
       key: "headline",
-      label: "Add a headline or bio",
+      label: "Add a headline or professional summary",
       done: input.hasHeadlineOrBio,
     },
     {
       key: "about",
-      label: "Add an About the Builder section",
+      label: "Add areas of interest to your About section",
       done: input.hasAboutSection,
     },
   ];

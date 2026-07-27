@@ -30,6 +30,12 @@ export interface FeedPost {
   // has no other way to show who posted. See feed_posts.sql.
   author_name: string;
   project_title: string | null;
+  // The shared Achievement's own title — distinct from project_title
+  // (the Seed's title) and evidence_summary (the Achievement's short
+  // description). Null for post types with no Achievement attached
+  // (project_started, project_completed, grove_update). See
+  // supabase/feed_posts_achievement_title.sql.
+  achievement_title: string | null;
   evidence_summary: string | null;
   skills: string[];
   visibility: FeedPostVisibility;
@@ -46,6 +52,7 @@ export interface CreateFeedPostInput {
   caption: string;
   author_name: string;
   project_title: string | null;
+  achievement_title: string | null;
   evidence_summary: string | null;
   skills: string[];
   visibility: FeedPostVisibility;

@@ -6,13 +6,6 @@
 
 import type { LifecycleStatus } from "./seed";
 
-export interface AboutBuilder {
-  enjoys: string;
-  interests: string;
-  direction: string;
-  technologies: string;
-}
-
 export interface OpportunitiesInfo {
   openToOpportunities: boolean;
   rolesOfInterest: string;
@@ -22,7 +15,7 @@ export interface OpportunitiesInfo {
   contactEmail: string;
 }
 
-// Repeatable Settings entries (Professional Profile section) — stored as
+// Repeatable Profile entries (Professional Profile section) — stored as
 // jsonb arrays on candidate_profiles (see supabase/candidate_settings.sql);
 // `id` is a client-generated uuid used for React keys and edit/delete
 // targeting within the array, never a separate DB row of its own.
@@ -63,19 +56,33 @@ export interface CertificationEntry {
 // not localStorage — see candidate_profiles.sql's header comment for the
 // migration this replaced.
 //
+// This is the single source of truth for everything Grove displays
+// except Evidence & Achievements, Projects, and Skills (which are
+// derived from published Achievements/Seeds instead) — edited
+// exclusively on the Profile page (see pages/CandidateProfile.tsx),
+// never on Grove itself, which only ever renders it read-only.
+//
 // professionalSkills is manually curated by the candidate for recruiter
-// readability ONLY — see CandidateSettings.tsx's header comment. It is
+// readability ONLY — see CandidateProfile.tsx's header comment. It is
 // never read by the semantic matching engine (match-candidates /
 // match-jobs-for-candidate), which continues to rely solely on published
-// Achievements plus the interest/direction fields already in
-// `opportunities` above.
+// Achievements plus the rolesOfInterest/areasOfInterest fields already
+// on this type.
 export interface GroveProfileFields {
   avatarUrl: string;
   headline: string;
-  bio: string;
+  // The candidate's own narrative: who they are, what they specialize
+  // in, the technologies/domains they work in, and what they're looking
+  // for. Rendered as Grove's About section — the DB column backing this
+  // is still named `bio` (see candidateProfileStore.ts), kept for now to
+  // avoid an unnecessary migration.
+  professionalSummary: string;
   location: string;
   availability: string;
-  about: AboutBuilder;
+  // Small supporting metadata shown alongside the professional summary
+  // on Grove, not the main content — the DB column backing this is
+  // still named `about_interests`.
+  areasOfInterest: string;
   opportunities: OpportunitiesInfo;
   education: EducationEntry[];
   experience: ExperienceEntry[];
@@ -215,13 +222,27 @@ export interface FeaturedSeedCard {
 }
 
 export interface SkillSupportingAchievement {
+  id: string;
   title: string;
+  shortDescription: string;
+  seedId: string;
   seedTitle: string;
+  technologiesUsed: string[];
+  proofUrl: string | null;
+  proofLabel: string | null;
 }
 
+// Confidence here is always evidence-derived, never a self-rating — see
+// deriveSkillsFromAchievements (lib/groveSkills.ts). projectCount is the
+// number of distinct Seeds among supportingAchievements (dedup'd there,
+// not recomputed by every consumer); technologies is the union of every
+// supporting achievement's technologiesUsed, for the Skill drawer's
+// "Technologies connected to this skill" section.
 export interface SkillSummary {
   skill: string;
   achievementCount: number;
+  projectCount: number;
+  technologies: string[];
   supportingAchievements: SkillSupportingAchievement[];
 }
 

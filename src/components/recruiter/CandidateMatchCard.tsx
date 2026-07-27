@@ -33,7 +33,7 @@ export default function CandidateMatchCard({ match, index = 0 }: CandidateMatchC
           )}
         </div>
         <span className="flex shrink-0 items-center justify-center rounded-full bg-accent-soft px-3 py-1 text-xs font-semibold text-accent-dark">
-          {match.matchScore}% match
+          {match.matchLabel} · {match.matchScore}%
         </span>
       </div>
 

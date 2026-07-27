@@ -1,11 +1,11 @@
 import { Link } from "react-router-dom";
-import { Sprout, Bot, Activity, Sparkles, Settings, Flame } from "lucide-react";
+import { Sprout, Bot, History, Sparkles, Settings, Flame } from "lucide-react";
 import type { WorkspaceTab } from "./tabs";
 import type { Seed } from "../../types/seed";
 
 const navItems: { tab: WorkspaceTab; label: string; icon: typeof Bot }[] = [
   { tab: "workspace", label: "Workspace", icon: Bot },
-  { tab: "activity", label: "Activity", icon: Activity },
+  { tab: "timeline", label: "Timeline", icon: History },
   { tab: "evidence", label: "Achievements", icon: Sparkles },
 ];
 

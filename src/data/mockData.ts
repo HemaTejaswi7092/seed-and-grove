@@ -1,23 +1,13 @@
-import {
-  Rocket,
-  GitBranch,
-  Wrench,
-  FileText,
-  Cpu,
-  GitCommit,
-  Zap,
-  ShieldCheck,
-} from "lucide-react";
 import type {
   PreviousProject,
   Opportunity,
   EvidenceItem,
   SkillLevel,
-  ActivityGroup,
   ProjectStat,
+  ProjectHeaderMetadataItem,
   Highlight,
 } from "../types/mockData";
-import type { Seed, SeedConversationMessage } from "../types/seed";
+import type { Seed, SeedConversationMessage, TimelineEvent } from "../types/seed";
 import type {
   GroveProfileFields,
   FeaturedSeedCard,
@@ -108,11 +98,23 @@ export const opportunities: Opportunity[] = [
   },
 ];
 
+// Still used only by the Dashboard's project-summary card (see
+// auth/useActiveProject.ts) — the Seed Workspace header uses
+// demoHeaderMetadata below instead, a smaller/different shape.
 export const demoProjectStats: ProjectStat[] = [
   { label: "Days building", value: "46" },
   { label: "Commits logged", value: "212" },
   { label: "Evidence points", value: "31" },
   { label: "Skills demonstrated", value: "6" },
+];
+
+// The Seed Workspace header's compact metadata row for the demo account
+// — see components/workspace/ProjectHeader.tsx.
+export const demoHeaderMetadata: ProjectHeaderMetadataItem[] = [
+  { emoji: "📅", value: "46", label: "Days" },
+  { emoji: "🏆", value: "6", label: "Achievements" },
+  { emoji: "🌱", value: "4", label: "Verified Skills" },
+  { emoji: "💻", value: "212", label: "Commits" },
 ];
 
 export const demoCopilotMessages: SeedConversationMessage[] = [
@@ -222,61 +224,63 @@ export const demoSkillLevels: SkillLevel[] = [
   { skill: "Technical Writing", mastery: 54 },
 ];
 
-export const demoActivityGroups: ActivityGroup[] = [
+// Mirrors the real Timeline tab's data shape exactly (see
+// components/workspace/Timeline.tsx / state/seedStore.ts's
+// getSeedTimeline) rather than being pre-grouped — the same grouping-by-
+// day component renders both, so the demo account's Timeline can never
+// drift from what a real one actually looks like. Dates are fixed, real
+// ISO timestamps loosely tracing VISIQ's (DEMO_SEED's) own createdAt/
+// publishedAt story, not "always today" — once they're no longer recent
+// they'll simply show under their real date, same as any real project's.
+export const demoTimelineEvents: TimelineEvent[] = [
   {
-    day: "Today",
-    entries: [
-      {
-        icon: Rocket,
-        title: "Shipped real-time inference pipeline",
-        timestamp: "2h ago",
-      },
-      {
-        icon: Zap,
-        title: "Cut p99 latency 3.5x with a ring buffer redesign",
-        timestamp: "3h ago",
-      },
-    ],
+    id: "demo-timeline-1",
+    seedId: DEMO_SEED_ID,
+    type: "project_created",
+    detail: null,
+    createdAt: "2026-06-08T09:00:00.000Z",
   },
   {
-    day: "Yesterday",
-    entries: [
-      {
-        icon: GitBranch,
-        title: "Refactored model versioning system",
-        timestamp: "Yesterday",
-      },
-      {
-        icon: Wrench,
-        title: "Resolved a memory leak in the video decoder",
-        timestamp: "Yesterday",
-      },
-    ],
+    id: "demo-timeline-2",
+    seedId: DEMO_SEED_ID,
+    type: "ai_plan_generated",
+    detail: null,
+    createdAt: "2026-06-08T09:15:00.000Z",
   },
   {
-    day: "This week",
-    entries: [
-      {
-        icon: FileText,
-        title: "Wrote architecture decision record on edge deployment",
-        timestamp: "4 days ago",
-      },
-      {
-        icon: Cpu,
-        title: "Benchmarked Jetson Orin against Coral for edge inference",
-        timestamp: "5 days ago",
-      },
-      {
-        icon: GitCommit,
-        title: "Set up CI pipeline for model regression tests",
-        timestamp: "6 days ago",
-      },
-      {
-        icon: ShieldCheck,
-        title: "Added input validation for the camera calibration step",
-        timestamp: "6 days ago",
-      },
-    ],
+    id: "demo-timeline-3",
+    seedId: DEMO_SEED_ID,
+    type: "repo_linked",
+    detail: null,
+    createdAt: "2026-06-10T14:00:00.000Z",
+  },
+  {
+    id: "demo-timeline-4",
+    seedId: DEMO_SEED_ID,
+    type: "milestone_completed",
+    detail: "Shipped real-time inference pipeline",
+    createdAt: "2026-06-20T10:00:00.000Z",
+  },
+  {
+    id: "demo-timeline-5",
+    seedId: DEMO_SEED_ID,
+    type: "achievement_created",
+    detail: "Cut p99 inference latency 3.5x via a lock-free ring buffer redesign",
+    createdAt: "2026-07-24T09:00:00.000Z",
+  },
+  {
+    id: "demo-timeline-6",
+    seedId: DEMO_SEED_ID,
+    type: "achievement_published",
+    detail: "Cut p99 inference latency 3.5x via a lock-free ring buffer redesign",
+    createdAt: "2026-07-24T09:05:00.000Z",
+  },
+  {
+    id: "demo-timeline-7",
+    seedId: DEMO_SEED_ID,
+    type: "project_published",
+    detail: null,
+    createdAt: "2026-07-24T12:00:00.000Z",
   },
 ];
 
@@ -321,17 +325,11 @@ export const growthAreas: Highlight[] = [
 export const demoGroveProfileFields: GroveProfileFields = {
   avatarUrl: "",
   headline: "Software Engineer · AI Systems Builder",
-  bio: "I build practical AI systems focused on solving real-world problems — from real-time inference to the pipelines that keep it reliable under load.",
+  professionalSummary:
+    "I build practical AI systems focused on solving real-world problems — from real-time inference to the pipelines that keep it reliable under load, working mainly in PyTorch, CUDA, Rust, TypeScript, and Postgres. I'm looking to grow into a founding or staff-level ML systems role.",
   location: "Orlando, FL",
   availability: "Open to full-time opportunities",
-  about: {
-    enjoys:
-      "Turning ambiguous, real-world signals into systems a machine can act on reliably.",
-    interests: "Computer vision, edge inference, developer tooling.",
-    direction:
-      "Looking to grow into a founding or staff-level ML systems role.",
-    technologies: "PyTorch, CUDA, Rust, TypeScript, Postgres.",
-  },
+  areasOfInterest: "Computer vision, edge inference, developer tooling",
   opportunities: {
     openToOpportunities: true,
     rolesOfInterest:
@@ -399,11 +397,24 @@ export const demoFeaturedSeeds: FeaturedSeedCard[] = [
   },
 ];
 
+// Every demo achievement lives on the one demo Seed, so projectCount is
+// always 1 and technologies is always the demo Seed's full list — a
+// simplification that's fine for illustrative preview data (see the
+// similar simplifications throughout demoFeaturedSeeds above).
 export const demoSkillSummaries: SkillSummary[] = Array.from(
   demoEvidenceFeed
     .reduce((map, item) => {
       const existing = map.get(item.skill);
-      const supporting = { title: item.summary, seedTitle: DEMO_SEED.title };
+      const supporting = {
+        id: item.id,
+        title: item.summary,
+        shortDescription: item.summary,
+        seedId: DEMO_SEED_ID,
+        seedTitle: DEMO_SEED.title,
+        technologiesUsed: DEMO_SEED.technologies,
+        proofUrl: null,
+        proofLabel: null,
+      };
       if (existing) {
         existing.achievementCount += 1;
         existing.supportingAchievements.push(supporting);
@@ -411,13 +422,20 @@ export const demoSkillSummaries: SkillSummary[] = Array.from(
         map.set(item.skill, {
           skill: item.skill,
           achievementCount: 1,
+          projectCount: 1,
+          technologies: DEMO_SEED.technologies,
           supportingAchievements: [supporting],
         });
       }
       return map;
     }, new Map<string, SkillSummary>())
     .values(),
-).sort((a, b) => b.achievementCount - a.achievementCount);
+).sort(
+  (a, b) =>
+    b.projectCount - a.projectCount ||
+    b.achievementCount - a.achievementCount ||
+    a.skill.localeCompare(b.skill),
+);
 
 export const demoAchievementHighlights: AchievementHighlight[] = demoEvidenceFeed.map(
   (item) => ({

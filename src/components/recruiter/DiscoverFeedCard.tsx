@@ -13,11 +13,13 @@ interface DiscoverFeedCardProps {
 }
 
 // Candidate professional activity only — no comments, no internal
-// messaging, no hiring-stage actions. "View Achievement" and "View
-// Candidate Profile" both land on the same read-only candidate-profile
-// route; the former also deep-links to this specific achievement's card
-// there via #achievement-<id> (see RecruiterCandidateProfile.tsx, which
-// sets that id on each achievement card).
+// messaging, no hiring-stage actions. "View Project" and "View Candidate
+// Profile" both land on the same read-only candidate-profile route; the
+// former also deep-links to this achievement's parent project card there
+// via #project-<id> (see FeaturedSeeds.tsx, which sets that id on each
+// project card). Achievements themselves no longer have their own
+// standalone anchor on that page — every achievement now only renders
+// inside its project's detail view, opened from that project card.
 export default function DiscoverFeedCard({
   achievement,
   candidate,
@@ -87,10 +89,10 @@ export default function DiscoverFeedCard({
         <p className="text-xs text-ink-faint">{timeAgo(achievement.created_at)}</p>
         <div className="flex items-center gap-4">
           <Link
-            to={`${profileHref}#achievement-${achievement.id}`}
+            to={`${profileHref}#project-${achievement.project_id}`}
             className="inline-flex items-center gap-1 text-xs font-medium text-accent-dark transition-colors hover:text-accent"
           >
-            View Achievement
+            View Project
             <ArrowUpRight className="h-3.5 w-3.5" strokeWidth={2} />
           </Link>
           <Link

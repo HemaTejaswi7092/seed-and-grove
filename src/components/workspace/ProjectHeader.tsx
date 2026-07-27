@@ -11,23 +11,29 @@ import {
   ArchiveRestore,
   Link2,
   X,
+  Plus,
 } from "lucide-react";
-import ProgressRing from "./ProgressRing";
 import { getInitials } from "../../lib/initials";
 import { useMenuDismissRef } from "../../lib/useMenuDismiss";
 import type { WorkspaceTab } from "./tabs";
 import type { Seed } from "../../types/seed";
-import type { ProjectStat } from "../../types/mockData";
+import type { ProjectHeaderMetadataItem } from "../../types/mockData";
 
 const tabs: { tab: WorkspaceTab; label: string }[] = [
   { tab: "workspace", label: "Workspace" },
-  { tab: "activity", label: "Activity" },
+  { tab: "timeline", label: "Timeline" },
   { tab: "evidence", label: "Achievements" },
 ];
 
 interface ProjectHeaderProps {
   seed: Seed;
-  stats: ProjectStat[];
+  // A single compact "📅 2 Days · 🏆 3 Achievements · ..." row — see
+  // pages/Seed.tsx for how each item is computed. Deliberately small and
+  // inline, not a stacked value/label block: lifecycle/publish state
+  // already has its own dedicated, un-redundant home (the title-line
+  // badges above and the Complete/Reopen/Publish buttons below), so this
+  // row is just build/evidence counts, nothing duplicated.
+  metadata: ProjectHeaderMetadataItem[];
   activeTab: WorkspaceTab;
   onTabChange: (tab: WorkspaceTab) => void;
   // The demo Seed ships pre-published/pre-completed and isn't backed by
@@ -36,8 +42,10 @@ interface ProjectHeaderProps {
   // do anything.
   onTogglePublish?: () => void;
   onShareToFeed?: () => void;
-  // Opens the completion checklist — Seed.tsx owns the actual
-  // completeSeed() call once the candidate confirms there.
+  // Opens the required Project Completion workflow — does NOT complete
+  // the project itself. Seed.tsx owns the actual completeSeed() call,
+  // which only happens once the candidate has logged at least one
+  // achievement from inside that workflow.
   onCompleteProject?: () => void;
   onReopenProject?: () => void;
   onArchiveProject?: () => void;
@@ -47,11 +55,17 @@ interface ProjectHeaderProps {
   // publishing. Omitted (like the other handlers) for the demo Seed,
   // which isn't backed by real storage.
   onSaveLinks?: (links: { repoUrl: string; demoUrl: string }) => Promise<void>;
+  // Manual, AI-free achievement entry — always available, independent of
+  // the completion workflow, so a candidate can record a milestone at
+  // any point. The completion workflow (opened via onCompleteProject)
+  // has its own built-in manual-add entry point too, for when AI
+  // suggestions are unavailable or insufficient at completion time.
+  onAddAchievement?: () => void;
 }
 
 export default function ProjectHeader({
   seed,
-  stats,
+  metadata,
   activeTab,
   onTabChange,
   onTogglePublish,
@@ -61,6 +75,7 @@ export default function ProjectHeader({
   onArchiveProject,
   onUnarchiveProject,
   onSaveLinks,
+  onAddAchievement,
 }: ProjectHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [linksModalOpen, setLinksModalOpen] = useState(false);
@@ -69,73 +84,56 @@ export default function ProjectHeader({
   const isCompleted = seed.lifecycleStatus === "completed";
 
   return (
-    <div className="border-b border-border bg-canvas-elevated px-8 pt-8">
-      <div className="flex flex-col flex-wrap gap-6 pb-6 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex items-start gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-ink text-sm font-semibold text-white">
+    <div className="border-b border-border bg-canvas-elevated px-6 pt-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-ink text-xs font-semibold text-white">
             {getInitials(seed.title)}
           </div>
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl font-semibold tracking-tight text-ink">
-                {seed.title}
-              </h1>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-accent-soft px-2.5 py-0.5 text-xs font-medium text-accent-dark">
-                <span className="relative flex h-1.5 w-1.5">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-75" />
-                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-accent" />
-                </span>
-                {seed.status}
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+            <h1 className="truncate text-lg font-semibold tracking-tight text-ink">
+              {seed.title}
+            </h1>
+            <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent-dark">
+              <span className="relative flex h-1.5 w-1.5">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-75" />
+                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-accent" />
               </span>
-              {isCompleted && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-ink px-2.5 py-0.5 text-xs font-medium text-white">
-                  <Trophy className="h-3 w-3" strokeWidth={2.25} />
-                  Completed
-                </span>
-              )}
-              {isArchived && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-border px-2.5 py-0.5 text-xs font-medium text-ink-faint">
-                  Archived
-                </span>
-              )}
-            </div>
-            <p className="mt-1 text-sm text-ink-soft">{seed.description}</p>
-            <p className="mt-2 flex items-center gap-1.5 text-xs font-medium text-accent-dark">
-              <Sparkles className="h-3.5 w-3.5" strokeWidth={2.25} />
-              AI Copilot ready — using your Seed context
-            </p>
-            {onSaveLinks && (
-              <button
-                type="button"
-                onClick={() => setLinksModalOpen(true)}
-                className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-ink-faint transition-colors hover:text-ink"
-              >
-                <Link2 className="h-3.5 w-3.5" strokeWidth={2} />
-                {seed.repoUrl || seed.demoUrl ? "Edit project links" : "Add repo/demo links"}
-              </button>
+              {seed.status}
+            </span>
+            {isCompleted && (
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-ink px-2 py-0.5 text-xs font-medium text-white">
+                <Trophy className="h-3 w-3" strokeWidth={2.25} />
+                Completed
+              </span>
+            )}
+            {isArchived && (
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-border px-2 py-0.5 text-xs font-medium text-ink-faint">
+                Archived
+              </span>
             )}
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-3">
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
           {onCompleteProject && seed.lifecycleStatus === "in_progress" && (
             <button
               type="button"
               onClick={onCompleteProject}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-medium text-ink-soft transition-colors hover:border-ink-faint hover:text-ink"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-xs font-medium text-ink-soft transition-colors hover:border-ink-faint hover:text-ink"
             >
               <Trophy className="h-3.5 w-3.5" strokeWidth={2} />
-              Mark Project as Complete
+              Complete Project
             </button>
           )}
           {onReopenProject && isCompleted && (
             <button
               type="button"
               onClick={onReopenProject}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-medium text-ink-soft transition-colors hover:border-ink-faint hover:text-ink"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-xs font-medium text-ink-soft transition-colors hover:border-ink-faint hover:text-ink"
             >
               <RotateCcw className="h-3.5 w-3.5" strokeWidth={2} />
-              Reopen Project
+              Reopen
             </button>
           )}
           {onTogglePublish && (
@@ -143,7 +141,7 @@ export default function ProjectHeader({
               type="button"
               onClick={onTogglePublish}
               className={[
-                "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
                 seed.isPublished
                   ? "border-accent-soft-border bg-accent-soft text-accent-dark"
                   : "border-border text-ink-soft hover:border-ink-faint",
@@ -152,7 +150,7 @@ export default function ProjectHeader({
               {seed.isPublished ? (
                 <>
                   <Globe className="h-3.5 w-3.5" strokeWidth={2} />
-                  Published to Grove
+                  Published
                 </>
               ) : (
                 <>
@@ -162,27 +160,26 @@ export default function ProjectHeader({
               )}
             </button>
           )}
+          {onAddAchievement && (
+            <button
+              type="button"
+              onClick={onAddAchievement}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-xs font-medium text-ink-soft transition-colors hover:border-ink-faint hover:text-ink"
+            >
+              <Plus className="h-3.5 w-3.5" strokeWidth={2} />
+              New Achievement
+            </button>
+          )}
           {onShareToFeed && seed.isPublished && (
             <button
               type="button"
               onClick={onShareToFeed}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border px-3 py-1.5 text-xs font-medium text-ink-soft transition-colors hover:border-ink-faint hover:text-ink"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-xs font-medium text-ink-soft transition-colors hover:border-ink-faint hover:text-ink"
             >
               <Share2 className="h-3.5 w-3.5" strokeWidth={2} />
-              Share to feed
+              Share
             </button>
           )}
-          <div className="flex gap-6">
-            {stats.map((stat) => (
-              <div key={stat.label}>
-                <p className="text-lg font-semibold text-ink">
-                  {stat.value}
-                </p>
-                <p className="text-xs text-ink-faint">{stat.label}</p>
-              </div>
-            ))}
-          </div>
-          <ProgressRing progress={seed.progress} />
 
           {(onArchiveProject || onUnarchiveProject) && (
             <div className="relative" ref={menuOpen ? menuRef : undefined}>
@@ -229,7 +226,38 @@ export default function ProjectHeader({
         </div>
       </div>
 
-      <div className="flex gap-6">
+      {seed.description && (
+        <p className="mt-1 truncate text-sm text-ink-soft">{seed.description}</p>
+      )}
+
+      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span className="inline-flex items-center gap-1 text-xs font-medium text-accent-dark">
+          <Sparkles className="h-3 w-3" strokeWidth={2.25} />
+          AI Copilot ready
+        </span>
+        {onSaveLinks && (
+          <button
+            type="button"
+            onClick={() => setLinksModalOpen(true)}
+            className="inline-flex items-center gap-1 text-xs font-medium text-ink-faint transition-colors hover:text-ink"
+          >
+            <Link2 className="h-3 w-3" strokeWidth={2} />
+            {seed.repoUrl || seed.demoUrl ? "Edit links" : "Add links"}
+          </button>
+        )}
+      </div>
+
+      <div className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs font-medium text-ink-soft">
+        {metadata.map((item, index) => (
+          <span key={item.label} className="inline-flex items-center gap-1.5">
+            {index > 0 && <span className="text-ink-faint">·</span>}
+            <span aria-hidden="true">{item.emoji}</span>
+            {item.value} {item.label}
+          </span>
+        ))}
+      </div>
+
+      <div className="mt-3 flex gap-5">
         {tabs.map((item) => {
           const isActive = activeTab === item.tab;
           return (
@@ -238,7 +266,7 @@ export default function ProjectHeader({
               type="button"
               onClick={() => onTabChange(item.tab)}
               className={[
-                "relative pb-3 text-sm font-medium transition-colors",
+                "relative pb-2 text-sm font-medium transition-colors",
                 isActive ? "text-ink" : "text-ink-faint hover:text-ink-soft",
               ].join(" ")}
             >

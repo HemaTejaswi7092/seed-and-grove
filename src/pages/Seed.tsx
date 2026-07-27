@@ -6,25 +6,23 @@ import ProjectHeader from "../components/workspace/ProjectHeader";
 import CopilotChat from "../components/workspace/CopilotChat";
 import EvidenceFeed from "../components/workspace/EvidenceFeed";
 import SkillGrowth from "../components/workspace/SkillGrowth";
-import ActivityTimeline from "../components/workspace/ActivityTimeline";
+import Timeline from "../components/workspace/Timeline";
 import EvidenceGrid from "../components/workspace/EvidenceGrid";
 import ShareToFeedModal from "../components/feed/ShareToFeedModal";
 import AchievementReviewModal, {
   type AchievementReviewFormValues,
 } from "../components/workspace/AchievementReviewModal";
-import CompleteProjectModal, {
-  type CompletionChecklistItem,
-} from "../components/workspace/CompleteProjectModal";
+import ProjectCompletionWorkflow from "../components/workspace/ProjectCompletionWorkflow";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { useAuth } from "../auth/useAuth";
 import { isDemoAccount, isDemoSeed } from "../config/demoAccount";
 import {
   DEMO_SEED,
-  demoProjectStats,
+  demoHeaderMetadata,
   demoCopilotMessages,
   demoEvidenceFeed,
   demoSkillLevels,
-  demoActivityGroups,
+  demoTimelineEvents,
 } from "../data/mockData";
 import {
   getSeed,
@@ -32,6 +30,7 @@ import {
   getSeedMessages,
   getSeedActivity,
   getSeedAchievements,
+  getSeedTimeline,
 } from "../state/seedStore";
 import {
   setSeedPublishedAndSync,
@@ -41,15 +40,18 @@ import {
   unarchiveSeedAndSync,
   updateSeedLinksAndSync,
 } from "../state/seedPublishing";
-import { updateAchievement, deleteAchievement } from "../state/achievements";
+import { createAchievement, updateAchievement, deleteAchievement } from "../state/achievements";
 import { createFeedPost } from "../state/feedStore";
+import { generateAchievementSuggestions } from "../services/ai/aiClient";
+import { buildEmptyAchievementFormValues } from "../lib/evidenceSuggestion";
 import { daysSince } from "../lib/dates";
 import { toDisplayAchievements } from "../lib/evidenceDisplay";
 import { getDisplayName } from "../lib/displayName";
 import type { WorkspaceTab } from "../components/workspace/tabs";
-import type { ProjectStat, EvidenceItem, ActivityGroup, SkillLevel } from "../types/mockData";
+import type { ProjectHeaderMetadataItem, EvidenceItem, SkillLevel } from "../types/mockData";
 import type { Achievement, SeedActivityItem } from "../types/seed";
 import type { FeedPostType, FeedPostVisibility } from "../types/feed";
+import type { EvidenceSuggestion } from "../services/ai/types";
 
 // What's carried from "Share to feed" being opened through to the actual
 // createFeedPost call — a snapshot of exactly what will be copied into
@@ -94,7 +96,18 @@ export default function Seed() {
   const [shareState, setShareState] = useState<ShareState | null>(null);
   const [editingAchievement, setEditingAchievement] = useState<Achievement | null>(null);
   const [deletingAchievement, setDeletingAchievement] = useState<Achievement | null>(null);
-  const [completeModalOpen, setCompleteModalOpen] = useState(false);
+  const [manualAchievementOpen, setManualAchievementOpen] = useState(false);
+  // Drives ProjectCompletionWorkflow. Opened by "Complete Project" — the
+  // project itself is NOT marked complete at that point, only once the
+  // candidate has logged >=1 achievement from inside the workflow and
+  // explicitly confirms there. completionSuggestions null = AI generation
+  // still in flight; completionAiUnavailable true = the call failed, so
+  // the workflow skips straight to manual-only mode instead of blocking.
+  const [completionWorkflowOpen, setCompletionWorkflowOpen] = useState(false);
+  const [completionSuggestions, setCompletionSuggestions] = useState<
+    EvidenceSuggestion[] | null
+  >(null);
+  const [completionAiUnavailable, setCompletionAiUnavailable] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const { user, profile } = useAuth();
 
@@ -130,65 +143,40 @@ export default function Seed() {
   // content lives only in the curated mockData arrays, never in this store.
   const rawActivity: SeedActivityItem[] = isDemo ? [] : getSeedActivity(user.id, seed.id);
   const rawAchievements: Achievement[] = isDemo ? [] : getSeedAchievements(user.id, seed.id);
+  // The Timeline tab's entire data source — meaningful, system-recognized
+  // project events only (see types/seed.ts's TimelineEvent and the
+  // writers that log them: state/seedStore.ts, state/achievements.ts,
+  // CopilotChat.tsx). Never chat messages or manual entries.
+  const timelineEvents = isDemo ? demoTimelineEvents : getSeedTimeline(user.id, seed.id);
 
   const evidence: EvidenceItem[] = isDemo
     ? demoEvidenceFeed
     : toDisplayAchievements(rawAchievements);
-  // Activity-timeline display (day-grouped, one icon per entry) doesn't yet
-  // have a mapping from freeform chat-derived SeedActivityItem records —
-  // real activity is captured (rawActivity, fed to the Copilot and stats)
-  // but not yet rendered in the Activity tab. See final report.
-  const activityGroups: ActivityGroup[] = isDemo ? demoActivityGroups : [];
   const skillLevels: SkillLevel[] = isDemo ? demoSkillLevels : [];
 
-  const stats: ProjectStat[] = isDemo
-    ? demoProjectStats
+  // The header's single compact "📅 2 Days · 🏆 3 Achievements · ..."
+  // row — lifecycle/publish state already has its own dedicated,
+  // non-redundant home elsewhere in the header (the title-line badges
+  // and the Complete/Reopen/Publish buttons), so this stays plain
+  // build/evidence counts instead of duplicating that state again.
+  const headerMetadata: ProjectHeaderMetadataItem[] = isDemo
+    ? demoHeaderMetadata
     : [
-        { label: "Days building", value: String(daysSince(seed.createdAt)) },
-        { label: "Commits logged", value: "0" },
-        { label: "Achievements", value: String(rawAchievements.length) },
+        { emoji: "📅", value: String(daysSince(seed.createdAt)), label: "Days" },
+        { emoji: "🏆", value: String(rawAchievements.length), label: "Achievements" },
         {
-          label: "Skills demonstrated",
+          emoji: "🌱",
           value: String(
             new Set(rawAchievements.flatMap((item) => item.skillsDemonstrated)).size,
           ),
+          label: "Verified Skills",
         },
+        { emoji: "💻", value: "0", label: "Commits" },
       ];
 
   const initialMessages = isDemo
     ? demoCopilotMessages
     : getSeedMessages(user.id, seed.id);
-
-  const checklist: CompletionChecklistItem[] = [
-    {
-      key: "summary",
-      label: "Project summary present",
-      done: currentSeed.description.trim().length > 0,
-    },
-    {
-      key: "achievement",
-      label: "At least one achievement present",
-      done: rawAchievements.length > 0,
-    },
-    {
-      key: "skills",
-      label: "Skills or technologies present",
-      done: rawAchievements.some(
-        (item) => item.skillsDemonstrated.length > 0 || item.technologiesUsed.length > 0,
-      ),
-    },
-    {
-      key: "outcome",
-      label: "Final outcome present",
-      done: rawAchievements.some((item) => item.outcomeOrImpact.trim().length > 0),
-    },
-    {
-      key: "proof",
-      label: "Supporting proof present",
-      done: rawAchievements.some((item) => !!item.proofUrl),
-      optional: true,
-    },
-  ];
 
   async function handleTogglePublish() {
     const nextPublished = !currentSeed.isPublished;
@@ -229,6 +217,36 @@ export default function Seed() {
     showToast("Achievement updated");
   }
 
+  // Manual "Add Achievement" — deliberately AI-free, always available
+  // (including before completion), so a candidate can record a milestone
+  // themselves whenever they want rather than waiting for completion or
+  // relying on the AI to have noticed it in chat.
+  async function handleSaveManualAchievement(
+    input: Parameters<typeof createAchievement>[2],
+  ) {
+    await createAchievement(currentUser.id, currentSeed.id, input);
+    setManualAchievementOpen(false);
+    forceRefresh((n) => n + 1);
+    showToast(
+      input.visibility === "published" ? "Achievement published to Grove" : "Achievement saved",
+    );
+  }
+
+  // Used by ProjectCompletionWorkflow for every achievement it can save —
+  // AI-suggestion quick actions (Publish/Save as Draft), the suggestion
+  // Edit form, and its own built-in manual-add form all go through this
+  // one path. The workflow owns its own per-suggestion resolved/error
+  // state, so there's no toast or modal-closing here; a thrown error
+  // surfaces inline in the workflow instead. forceRefresh is what makes
+  // rawAchievements.length (and so the completion gate) update live as
+  // soon as any of these saves lands.
+  async function handleSaveCompletionAchievement(
+    input: Parameters<typeof createAchievement>[2],
+  ) {
+    await createAchievement(currentUser.id, currentSeed.id, input);
+    forceRefresh((n) => n + 1);
+  }
+
   // Opens the confirmation dialog — the actual delete only happens once
   // the candidate explicitly confirms there (handleConfirmDeleteAchievement).
   function handleRequestDeleteAchievement(achievementId: string) {
@@ -248,9 +266,38 @@ export default function Seed() {
     showToast("Achievement deleted");
   }
 
-  async function handleConfirmComplete() {
+  // "Complete Project" opens the workflow instead of completing anything
+  // — AI generation fires immediately in the background so suggestions
+  // (or the unavailable state) are ready by the time the candidate has
+  // looked at the modal. A failed AI call never blocks this: it just
+  // flips completionAiUnavailable so the workflow skips straight to
+  // manual-only mode instead of showing an error.
+  async function handleOpenCompletionWorkflow() {
+    setCompletionSuggestions(null);
+    setCompletionAiUnavailable(false);
+    setCompletionWorkflowOpen(true);
+
+    try {
+      const result = await generateAchievementSuggestions({
+        seed: currentSeed,
+        recentMessages: getSeedMessages(currentUser.id, currentSeed.id),
+        activity: getSeedActivity(currentUser.id, currentSeed.id),
+        achievements: getSeedAchievements(currentUser.id, currentSeed.id),
+      });
+      setCompletionSuggestions(result.suggestions);
+    } catch {
+      setCompletionAiUnavailable(true);
+    }
+  }
+
+  // The gated, terminal action inside ProjectCompletionWorkflow — only
+  // reachable there once rawAchievements.length > 0, so this never needs
+  // to re-check that itself. Project completion and achievement creation
+  // are still two separate writes; this one only ever runs after at
+  // least one achievement already exists.
+  async function handleCompleteFromWorkflow() {
     await completeSeedAndSync(currentUser.id, currentSeed.id);
-    setCompleteModalOpen(false);
+    setCompletionWorkflowOpen(false);
     forceRefresh((n) => n + 1);
     showToast("Project marked complete");
   }
@@ -294,7 +341,8 @@ export default function Seed() {
   // published — no achievement attached, just the project-level snapshot.
   function handleOpenShareForProject() {
     setShareState({
-      postType: currentSeed.progress >= 100 ? "project_completed" : "project_started",
+      postType:
+        currentSeed.lifecycleStatus === "completed" ? "project_completed" : "project_started",
       seedId: currentSeed.id,
       evidenceId: null,
       projectTitle: currentSeed.title,
@@ -341,16 +389,17 @@ export default function Seed() {
         <WorkspaceTopbar seedTitle={seed.title} />
         <ProjectHeader
           seed={seed}
-          stats={stats}
+          metadata={headerMetadata}
           activeTab={activeTab}
           onTabChange={setActiveTab}
           onTogglePublish={isDemo ? undefined : handleTogglePublish}
           onShareToFeed={isDemo ? undefined : handleOpenShareForProject}
-          onCompleteProject={isDemo ? undefined : () => setCompleteModalOpen(true)}
+          onCompleteProject={isDemo ? undefined : handleOpenCompletionWorkflow}
           onReopenProject={isDemo ? undefined : handleReopenProject}
           onArchiveProject={isDemo ? undefined : handleArchiveProject}
           onUnarchiveProject={isDemo ? undefined : handleUnarchiveProject}
           onSaveLinks={isDemo ? undefined : handleSaveProjectLinks}
+          onAddAchievement={isDemo ? undefined : () => setManualAchievementOpen(true)}
         />
 
         <div className="flex-1 overflow-y-auto">
@@ -382,9 +431,7 @@ export default function Seed() {
             </div>
           )}
 
-          {activeTab === "activity" && (
-            <ActivityTimeline activityGroups={activityGroups} />
-          )}
+          {activeTab === "timeline" && <Timeline events={timelineEvents} />}
           {activeTab === "evidence" && (
             <EvidenceGrid
               achievements={rawAchievements}
@@ -416,12 +463,24 @@ export default function Seed() {
         />
       )}
 
-      {completeModalOpen && (
-        <CompleteProjectModal
-          projectTitle={currentSeed.title}
-          checklist={checklist}
-          onClose={() => setCompleteModalOpen(false)}
-          onConfirm={handleConfirmComplete}
+      {manualAchievementOpen && (
+        <AchievementReviewModal
+          mode="create"
+          initial={buildEmptyAchievementFormValues(currentSeed)}
+          onClose={() => setManualAchievementOpen(false)}
+          onSave={handleSaveManualAchievement}
+        />
+      )}
+
+      {completionWorkflowOpen && (
+        <ProjectCompletionWorkflow
+          seed={currentSeed}
+          suggestions={completionSuggestions}
+          aiUnavailable={completionAiUnavailable}
+          achievementCount={rawAchievements.length}
+          onClose={() => setCompletionWorkflowOpen(false)}
+          onSaveAchievement={handleSaveCompletionAchievement}
+          onComplete={handleCompleteFromWorkflow}
         />
       )}
 

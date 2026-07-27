@@ -63,7 +63,7 @@ supabase/functions/seed-copilot/
 Default models (verified against each provider's current docs at the time
 they were wired up — not guessed):
 
-- Groq: `llama-3.3-70b-versatile` (131K context, full tool-use support
+- Groq: `llama-3.1-8b-instant` (131K context, full tool-use support
   including forced `tool_choice`, active production model).
 - Anthropic: `claude-sonnet-5`.
 
@@ -180,7 +180,7 @@ supabase link --project-ref <project-ref>
 supabase secrets set GROQ_API_KEY=gsk_your_real_key_here
 
 # Optional overrides:
-supabase secrets set GROQ_MODEL=llama-3.3-70b-versatile
+supabase secrets set GROQ_MODEL=llama-3.1-8b-instant
 supabase secrets set AI_PROVIDER=groq   # or "anthropic"
 
 # To switch back to (or add) Anthropic instead/alongside:

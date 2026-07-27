@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowUpRight, UserPlus, UserCheck } from "lucide-react";
 import { getInitials } from "../../lib/initials";
@@ -19,6 +19,42 @@ interface FeedPostCardProps {
   // account (its posts have no real auth.users row to follow).
   isFollowing?: boolean;
   onToggleFollow?: () => void;
+  // True only when post.evidence_id still resolves to a real, currently
+  // published Achievement (see Dashboard.tsx's listExistingAchievementIds
+  // check) — an older post whose Achievement was since unpublished or
+  // deleted renders its achievement_title as plain text instead of a
+  // dead anchor link.
+  isAchievementLinkValid?: boolean;
+}
+
+// One small shared renderer for project_title/achievement_title: either a
+// clickable line (Link, with clear hover/focus affordance) or plain text
+// when there's nowhere safe to send it — same visual language either
+// way, just the interactive styling layered on when a real href exists.
+function TitleLine({
+  text,
+  href,
+  emphasis,
+}: {
+  text: string;
+  href: string | null;
+  emphasis: "primary" | "secondary";
+}) {
+  const sizeClasses =
+    emphasis === "primary" ? "text-sm font-semibold text-ink" : "text-xs font-medium text-ink-faint";
+
+  if (!href) {
+    return <p className={sizeClasses}>{text}</p>;
+  }
+  return (
+    <Link
+      to={href}
+      onClick={(event) => event.stopPropagation()}
+      className={`${sizeClasses} block underline-offset-2 transition-colors hover:text-accent-dark hover:underline focus-visible:text-accent-dark focus-visible:underline focus-visible:outline-none`}
+    >
+      {text}
+    </Link>
+  );
 }
 
 export default function FeedPostCard({
@@ -27,16 +63,38 @@ export default function FeedPostCard({
   index = 0,
   isFollowing,
   onToggleFollow,
+  isAchievementLinkValid = false,
 }: FeedPostCardProps) {
+  const navigate = useNavigate();
   const meta = FEED_POST_META[post.post_type];
   const Icon = meta.icon;
+  const profileHref = `/candidates/${post.user_id}/preview`;
+
+  // Reuses the existing candidate-preview route (see App.tsx) — no new
+  // page. The whole card is one click target rather than a separate
+  // "View Profile" button; interactive children (Follow, the own-post
+  // View Project/View Grove links) stop propagation in their own
+  // handlers below so they keep working independently.
+  function goToProfile() {
+    navigate(profileHref);
+  }
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: "easeOut", delay: index * 0.05 }}
-      className="rounded-2xl border border-border bg-canvas-elevated p-6"
+      onClick={goToProfile}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          goToProfile();
+        }
+      }}
+      role="link"
+      tabIndex={0}
+      aria-label={`View ${post.author_name}'s profile`}
+      className="cursor-pointer rounded-2xl border border-border bg-canvas-elevated p-6 transition-colors hover:border-ink-faint/50"
     >
       <div className="flex items-start gap-3">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-ink text-xs font-semibold text-white">
@@ -52,7 +110,10 @@ export default function FeedPostCard({
         {onToggleFollow && (
           <button
             type="button"
-            onClick={onToggleFollow}
+            onClick={(event) => {
+              event.stopPropagation();
+              onToggleFollow();
+            }}
             className={[
               "inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
               isFollowing
@@ -80,10 +141,44 @@ export default function FeedPostCard({
 
       <p className="mt-4 text-sm leading-relaxed text-ink">{post.caption}</p>
 
-      {(post.project_title || post.evidence_summary || post.skills.length > 0) && (
+      {(post.project_title ||
+        post.achievement_title ||
+        post.evidence_summary ||
+        post.skills.length > 0) && (
         <div className="mt-4 rounded-xl border border-border bg-canvas p-4">
           {post.project_title && (
-            <p className="text-sm font-semibold text-ink">{post.project_title}</p>
+            <TitleLine
+              text={post.project_title}
+              // Only public trace of a project cross-user is the
+              // candidate's own profile page — no separate public
+              // project/Seed page exists (Seeds are client-local, never
+              // in Postgres; see feed_posts.sql). Demoted to a secondary
+              // line whenever an Achievement title is also shown below,
+              // since the Achievement is the more specific destination.
+              href={post.seed_id ? profileHref : null}
+              emphasis={post.achievement_title ? "secondary" : "primary"}
+            />
+          )}
+          {post.achievement_title && (
+            <div className={post.project_title ? "mt-0.5" : undefined}>
+              <TitleLine
+                text={post.achievement_title}
+                // Reuses the same anchor DiscoverFeedCard.tsx already links
+                // to on this page (see FeaturedSeeds.tsx's project cards) —
+                // achievements no longer have their own standalone anchor,
+                // so this deep-links to the achievement's parent project
+                // card instead, only when both the parent Seed/project and
+                // a still-published Achievement are confirmed to exist;
+                // otherwise this renders as plain text rather than a dead
+                // anchor.
+                href={
+                  isAchievementLinkValid && post.seed_id
+                    ? `${profileHref}#project-${post.seed_id}`
+                    : null
+                }
+                emphasis="primary"
+              />
+            </div>
           )}
           {post.evidence_summary && (
             <p className="mt-1 text-sm leading-relaxed text-ink-soft">
@@ -106,7 +201,10 @@ export default function FeedPostCard({
       )}
 
       {isOwnPost && (
-        <div className="mt-4 flex items-center gap-4 border-t border-border pt-4">
+        <div
+          className="mt-4 flex items-center gap-4 border-t border-border pt-4"
+          onClick={(event) => event.stopPropagation()}
+        >
           {post.seed_id && (
             <Link
               to={`/seeds/${post.seed_id}`}

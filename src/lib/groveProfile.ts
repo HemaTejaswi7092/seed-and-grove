@@ -10,16 +10,12 @@ import type { GroveProfileFields } from "../types/grove";
  */
 
 export const EMPTY_GROVE_PROFILE_FIELDS: GroveProfileFields = {
+  avatarUrl: "",
   headline: "",
-  bio: "",
+  professionalSummary: "",
   location: "",
   availability: "",
-  about: {
-    enjoys: "",
-    interests: "",
-    direction: "",
-    technologies: "",
-  },
+  areasOfInterest: "",
   opportunities: {
     openToOpportunities: false,
     rolesOfInterest: "",
@@ -28,13 +24,22 @@ export const EMPTY_GROVE_PROFILE_FIELDS: GroveProfileFields = {
     contactVisible: false,
     contactEmail: "",
   },
-  education: "",
-  experience: "",
+  education: [],
+  experience: [],
+  certifications: [],
+  professionalSkills: [],
   workAuthorization: "",
+  requiresSponsorship: false,
+  preferredJobTypes: [],
+  preferredLocations: [],
+  availabilityDate: "",
+  yearsOfExperience: "",
   resumeUrl: "",
+  resumeVisible: false,
   linkedinUrl: "",
   githubUrl: "",
   portfolioUrl: "",
+  websiteUrl: "",
 };
 
 function legacyStorageKey(userId: string): string {
@@ -49,11 +54,17 @@ export function loadLegacyGroveProfileFields(
   try {
     const raw = localStorage.getItem(legacyStorageKey(userId));
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<GroveProfileFields>;
+    // Only the fields that existed in this shape when localStorage was
+    // still the source of truth are migrated — education/experience were
+    // free text back then and are structured arrays now, so a legacy
+    // string value for either is deliberately dropped rather than
+    // spread over the (correctly-typed) empty defaults below.
+    const parsed = JSON.parse(raw) as Partial<
+      Omit<GroveProfileFields, "education" | "experience">
+    >;
     return {
       ...EMPTY_GROVE_PROFILE_FIELDS,
       ...parsed,
-      about: { ...EMPTY_GROVE_PROFILE_FIELDS.about, ...parsed.about },
       opportunities: {
         ...EMPTY_GROVE_PROFILE_FIELDS.opportunities,
         ...parsed.opportunities,
@@ -78,17 +89,14 @@ export function clearLegacyGroveProfileFields(userId: string): void {
 export function isGroveProfileFieldsEmpty(fields: GroveProfileFields): boolean {
   return !(
     fields.headline.trim() ||
-    fields.bio.trim() ||
+    fields.professionalSummary.trim() ||
     fields.location.trim() ||
     fields.availability.trim() ||
-    fields.about.enjoys.trim() ||
-    fields.about.interests.trim() ||
-    fields.about.direction.trim() ||
-    fields.about.technologies.trim() ||
+    fields.areasOfInterest.trim() ||
     fields.opportunities.openToOpportunities ||
     fields.opportunities.rolesOfInterest.trim() ||
-    fields.education.trim() ||
-    fields.experience.trim() ||
+    fields.education.length > 0 ||
+    fields.experience.length > 0 ||
     fields.workAuthorization.trim() ||
     fields.resumeUrl.trim() ||
     fields.linkedinUrl.trim() ||

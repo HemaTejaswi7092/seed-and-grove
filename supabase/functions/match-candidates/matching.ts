@@ -1,3 +1,4 @@
+import { matchLabel, similarityToPercent } from "../_shared/matching.ts";
 import type {
   AchievementMatchRow,
   CandidateMatchResult,
@@ -28,10 +29,6 @@ function buildMatchSentence(top: AchievementMatchRow): string {
   return detail ? `Matches through "${top.title}" — ${detail}` : `Matches through "${top.title}"`;
 }
 
-function clampToPercent(similarity: number): number {
-  return Math.round(Math.max(0, Math.min(1, similarity)) * 100);
-}
-
 // Groups retrieved Achievements by candidate, ranks candidates by their
 // single strongest piece of evidence (max similarity, not an average —
 // one excellent match should outrank several mediocre ones), and keeps
@@ -60,17 +57,19 @@ export function groupAndRankCandidates(
 
   return ranked.map(({ candidateId, top, score }) => {
     const profile = profilesById.get(candidateId);
+    const percent = similarityToPercent(score);
     return {
       candidateId,
       name: profile?.full_name?.trim() || "Candidate",
       headline: profile?.headline ?? "",
-      matchScore: clampToPercent(score),
+      matchScore: percent,
+      matchLabel: matchLabel(percent),
       matchSentence: buildMatchSentence(top[0]),
       achievements: top.map((a) => ({
         id: a.id,
         title: a.title,
         shortDescription: a.short_description,
-        similarity: clampToPercent(a.similarity) / 100,
+        similarity: similarityToPercent(a.similarity) / 100,
       })),
     };
   });

@@ -14,7 +14,8 @@ import Seeds from "./pages/Seeds";
 import Seed from "./pages/Seed";
 import Grove from "./pages/Grove";
 import Opportunities from "./pages/Opportunities";
-import Profile from "./pages/Profile";
+import JobDetail from "./pages/JobDetail";
+import CandidateProfile from "./pages/CandidateProfile";
 import RecruiterSignUp from "./pages/RecruiterSignUp";
 import RecruiterDashboard from "./pages/RecruiterDashboard";
 import RecruiterJobs from "./pages/RecruiterJobs";
@@ -64,7 +65,19 @@ function App() {
           <Route path="/seed/new" element={<SeedNew />} />
           <Route path="/grove" element={<Grove />} />
           <Route path="/opportunities" element={<Opportunities />} />
-          <Route path="/profile" element={<Profile />} />
+          <Route path="/opportunities/:jobId" element={<JobDetail />} />
+          <Route path="/profile" element={<CandidateProfile />} />
+          {/* Reuses the recruiter-facing candidate profile component
+              verbatim under candidate-nav chrome instead — it already
+              reads only candidate_profiles_public + published
+              Achievements (the same redaction any recruiter gets), so a
+              candidate previewing their own id sees exactly what a
+              recruiter would. RecruiterCandidateProfile itself has no
+              recruiter-only actions in its body. */}
+          <Route
+            path="/candidates/:candidateId/preview"
+            element={<RecruiterCandidateProfile />}
+          />
         </Route>
 
         {/* Recruiter-side counterpart — no Seed, no Grove, no candidate

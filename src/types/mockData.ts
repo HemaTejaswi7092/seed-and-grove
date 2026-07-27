@@ -1,5 +1,3 @@
-import type { LucideIcon } from "lucide-react";
-
 export interface PreviousProject {
   id: string;
   name: string;
@@ -29,20 +27,20 @@ export interface SkillLevel {
   mastery: number;
 }
 
-export interface ActivityEntry {
-  icon: LucideIcon;
-  title: string;
-  timestamp: string;
-}
-
-export interface ActivityGroup {
-  day: string;
-  entries: ActivityEntry[];
-}
-
 export interface ProjectStat {
   label: string;
   value: string;
+}
+
+// The Seed Workspace header's compact inline metadata row (see
+// ProjectHeader.tsx) — deliberately a different, smaller shape than
+// ProjectStat above (which the Dashboard's project-summary card still
+// uses as-is): just enough to render "📅 2 Days" in one line, not a
+// stacked value/label block.
+export interface ProjectHeaderMetadataItem {
+  emoji: string;
+  value: string;
+  label: string;
 }
 
 export interface Highlight {

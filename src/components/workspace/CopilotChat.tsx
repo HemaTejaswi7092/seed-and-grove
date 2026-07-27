@@ -2,8 +2,14 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bot, Send, Sparkles, ShieldCheck, ChevronDown, X } from "lucide-react";
 import { generateCopilotResponse } from "../../services/ai/aiClient";
-import { addSeedActivity, addSeedMessage } from "../../state/seedStore";
+import {
+  addSeedActivity,
+  addSeedMessage,
+  addTimelineEvent,
+  getSeedTimeline,
+} from "../../state/seedStore";
 import { createAchievement } from "../../state/achievements";
+import { evidenceSuggestionToFormValues } from "../../lib/evidenceSuggestion";
 import AchievementReviewModal from "./AchievementReviewModal";
 import type { Seed, SeedActivityItem, SeedConversationMessage, Achievement } from "../../types/seed";
 import type { EvidenceSuggestion, RetrievedContextItem } from "../../services/ai/types";
@@ -169,6 +175,20 @@ export default function CopilotChat({
       if (persist && userId && response.activityContent) {
         addSeedActivity(userId, seed.id, "progress", response.activityContent);
         onDataCaptured?.();
+      }
+
+      // Timeline-worthy exactly once per Seed — the AI producing its
+      // first real plan is a meaningful project milestone, but every
+      // later "asking_for_plan" reply is just ongoing conversation (see
+      // types/seed.ts's TimelineEvent — never logged per chat message).
+      if (persist && userId && response.intent === "asking_for_plan") {
+        const hasPlanEvent = getSeedTimeline(userId, seed.id).some(
+          (event) => event.type === "ai_plan_generated",
+        );
+        if (!hasPlanEvent) {
+          addTimelineEvent(userId, seed.id, "ai_plan_generated");
+          onDataCaptured?.();
+        }
       }
 
       setStatus("idle");
@@ -428,31 +448,10 @@ export default function CopilotChat({
       {reviewMessageId && messageExtras[reviewMessageId]?.evidenceSuggestion && (
         <AchievementReviewModal
           mode="create"
-          initial={{
-            title: messageExtras[reviewMessageId].evidenceSuggestion!.title,
-            shortDescription: messageExtras[reviewMessageId].evidenceSuggestion!.description,
-            achievementType: "milestone",
-            skillsDemonstrated: (
-              messageExtras[reviewMessageId].evidenceSuggestion!.skillsDemonstrated ?? [
-                messageExtras[reviewMessageId].evidenceSuggestion!.category,
-              ]
-            ).join(", "),
-            technologiesUsed: (
-              messageExtras[reviewMessageId].evidenceSuggestion!.technologiesUsed ?? []
-            ).join(", "),
-            projectDomain:
-              messageExtras[reviewMessageId].evidenceSuggestion!.projectDomain ?? "",
-            candidateContribution:
-              messageExtras[reviewMessageId].evidenceSuggestion!.candidateContribution ?? "",
-            outcomeOrImpact:
-              messageExtras[reviewMessageId].evidenceSuggestion!.outcomeOrImpact ?? "",
-            proofUrl: "",
-            proofLabel: "",
-            relevantRoles: (
-              messageExtras[reviewMessageId].evidenceSuggestion!.relevantRoles ?? []
-            ).join(", "),
-            visibility: "private",
-          }}
+          initial={evidenceSuggestionToFormValues(
+            messageExtras[reviewMessageId].evidenceSuggestion!,
+            "private",
+          )}
           onClose={() => setReviewMessageId(null)}
           onSave={handleSaveAchievement}
         />

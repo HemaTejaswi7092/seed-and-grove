@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { GraduationCap, Award, Users } from "lucide-react";
 import type { GroveProfileFields } from "../../types/grove";
 
@@ -6,7 +7,6 @@ type DetailFields = Pick<
   | "education"
   | "experience"
   | "certifications"
-  | "professionalSkills"
   | "workAuthorization"
   | "requiresSponsorship"
 > & {
@@ -17,36 +17,27 @@ type DetailFields = Pick<
 interface ProfessionalDetailsProps {
   fields: DetailFields;
   isOwner: boolean;
-  // Experience/education/certifications/professional skills are edited in
-  // Settings; roles of interest/collaboration interests are edited in the
-  // Edit Grove modal (Opportunities section) — two different edit
-  // surfaces for historical reasons, so this section exposes two
-  // separate, precisely-labeled edit affordances rather than one that
-  // would only work for part of what's shown.
-  onEditInSettings: () => void;
-  onEditPreferences: () => void;
 }
 
 // Shown on both the candidate's own Grove (read-only here) and the
 // recruiter's read-only candidate profile — pure presentation, identical
-// either way, just isOwner=false there.
+// either way, just isOwner=false there. Everything shown is edited
+// exclusively on the Profile page; "Edit" here is always a plain link to
+// /profile, never a local form.
 //
-// professionalSkills is the candidate's own manually-curated list (see
-// CandidateSettings.tsx) — shown here for recruiter readability only, and
-// entirely separate from DemonstratedSkills (achievement-derived,
-// rendered in the Projects & Skills section). Neither this component nor
-// its data feeds the semantic matching engine.
+// Deliberately does NOT show the candidate's self-reported
+// professionalSkills list (see CandidateProfile.tsx) — Verified Skills
+// (VerifiedSkills.tsx, achievement-derived) is the single source of
+// truth for skills shown on Grove, so a second, unverified list here
+// would only be redundant and confusing.
 export default function ProfessionalDetails({
   fields,
   isOwner,
-  onEditInSettings,
-  onEditPreferences,
 }: ProfessionalDetailsProps) {
   const hasAnything =
     fields.experience.length > 0 ||
     fields.education.length > 0 ||
     fields.certifications.length > 0 ||
-    fields.professionalSkills.length > 0 ||
     fields.workAuthorization.trim() ||
     fields.rolesOfInterest.trim() ||
     fields.collaborationInterests.trim();
@@ -66,13 +57,12 @@ export default function ProfessionalDetails({
             Add your education, experience, and certifications so
             recruiters can learn more.
           </p>
-          <button
-            type="button"
-            onClick={onEditInSettings}
+          <Link
+            to="/profile"
             className="mt-5 inline-flex items-center gap-1.5 rounded-full border border-border px-4 py-2 text-xs font-medium text-ink-soft transition-colors hover:border-ink-faint hover:text-ink"
           >
-            Add details in Settings
-          </button>
+            Add details in Profile
+          </Link>
         </div>
       </section>
     );
@@ -85,13 +75,12 @@ export default function ProfessionalDetails({
           Background
         </h2>
         {isOwner && (
-          <button
-            type="button"
-            onClick={onEditInSettings}
+          <Link
+            to="/profile"
             className="text-xs font-medium text-accent-dark transition-colors hover:text-accent"
           >
-            Edit in Settings
-          </button>
+            Edit in Profile
+          </Link>
         )}
       </div>
 
@@ -181,24 +170,6 @@ export default function ProfessionalDetails({
         </div>
       )}
 
-      {fields.professionalSkills.length > 0 && (
-        <div className="mt-4">
-          <p className="text-xs font-medium tracking-wide text-ink-faint uppercase">
-            Professional Skills
-          </p>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {fields.professionalSkills.map((skill) => (
-              <span
-                key={skill}
-                className="rounded-full border border-border px-2.5 py-1 text-[11px] font-medium text-ink-soft"
-              >
-                {skill}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
       {fields.workAuthorization.trim() && (
         <div className="mt-4">
           <p className="text-xs font-medium tracking-wide text-ink-faint uppercase">
@@ -222,13 +193,12 @@ export default function ProfessionalDetails({
               Preferences
             </p>
             {isOwner && (
-              <button
-                type="button"
-                onClick={onEditPreferences}
+              <Link
+                to="/profile"
                 className="text-xs font-medium text-accent-dark transition-colors hover:text-accent"
               >
                 Edit
-              </button>
+              </Link>
             )}
           </div>
           {fields.rolesOfInterest.trim() && (

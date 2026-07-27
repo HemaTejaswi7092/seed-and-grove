@@ -17,9 +17,8 @@ interface ShareToFeedModalProps {
 
 // Mounted by the caller only while there's something to share (Seed.tsx
 // renders `{shareState && <ShareToFeedModal ... />}`) rather than taking
-// an `open` prop — same fix as EditGroveModal: a fresh mount per open
-// means useState's initial value is always current, no effect needed to
-// re-sync a stale draft.
+// an `open` prop — a fresh mount per open means useState's initial value
+// is always current, no effect needed to re-sync a stale draft.
 export default function ShareToFeedModal({
   projectTitle,
   evidenceSummary,

@@ -30,8 +30,19 @@ import { corsHeaders, jsonResponse } from "./cors.ts";
 import { classifyIntent } from "./intent.ts";
 import { retrieveMemory, saveMemory, toRetrievedContext } from "./memory.ts";
 import { buildUserTurn } from "./prompt.ts";
-import { callAiProvider, resolveProviderName } from "./provider.ts";
-import type { CopilotRequestBody, CopilotResponseBody, CopilotToolOutput } from "./types.ts";
+import { buildAchievementDraftUserTurn } from "./achievementDraft.ts";
+import {
+  callAiProvider,
+  callAiProviderForAchievementDraft,
+  resolveProviderName,
+} from "./provider.ts";
+import { classifyProviderError } from "./providerError.ts";
+import type {
+  AchievementDraftResponseBody,
+  CopilotRequestBody,
+  CopilotResponseBody,
+  CopilotToolOutput,
+} from "./types.ts";
 
 const PROVIDER_UNAVAILABLE_MESSAGE =
   "The AI provider is temporarily unavailable. Please try again.";
@@ -102,6 +113,50 @@ Deno.serve(async (req: Request) => {
       messagePreview: body.message.slice(0, 80),
     });
 
+    // Fires automatically when a candidate marks a Seed complete (see
+    // Seed.tsx's handleConfirmComplete) — a single-purpose request with
+    // its own prompt, tool schema, and response shape (see
+    // achievementDraft.ts). Never chats, never touches long-term memory
+    // (nothing here is a durable fact worth recalling later; it's a
+    // one-off generation action), and returns before any of the chat-flow
+    // logic below runs. Completion itself already succeeded before the
+    // frontend ever calls this — a failure here is reported to the
+    // candidate as "suggestions unavailable," never as completion having
+    // failed.
+    if (body.mode === "generate_achievement") {
+      const draftUserTurn = buildAchievementDraftUserTurn({
+        seedContext: body.seedContext,
+        recentMessages: body.recentMessages ?? [],
+        activity: body.activity ?? [],
+        evidence: body.evidence ?? [],
+      });
+      console.log("[debug] achievement-suggestions prompt built", { userTurnLength: draftUserTurn.length });
+
+      const providerName = resolveProviderName();
+      console.log("[debug] calling AI provider for achievement suggestions...", { provider: providerName });
+      try {
+        const draftOutput = await callAiProviderForAchievementDraft(draftUserTurn);
+        console.log("[debug] achievement-suggestions provider responded", {
+          provider: providerName,
+          count: draftOutput.suggestions.length,
+        });
+        const responseBody: AchievementDraftResponseBody = {
+          reason: draftOutput.reason,
+          suggestions: draftOutput.suggestions,
+        };
+        return jsonResponse(responseBody);
+      } catch (err) {
+        const classified = classifyProviderError(err);
+        console.error("[copilot] AI provider call failed (achievement suggestions)", {
+          provider: providerName,
+          code: classified.code,
+          status: classified.status,
+          message: classified.message,
+        });
+        return jsonResponse({ error: PROVIDER_UNAVAILABLE_MESSAGE }, 502);
+      }
+    }
+
     const intent = classifyIntent(body.message);
     console.log("[debug] classified intent", { intent });
 
@@ -134,7 +189,18 @@ Deno.serve(async (req: Request) => {
     try {
       toolOutput = await callAiProvider(userTurn);
     } catch (err) {
-      console.error("[debug] AI provider call failed:", { provider: providerName, err });
+      // Classified so this is greppable/alertable by cause (rate limit vs.
+      // bad key vs. timeout vs. genuine outage) instead of only a raw,
+      // differently-worded string per provider — see providerError.ts.
+      // Deliberately still only ever a generic message to the client; the
+      // classification is for the function logs only.
+      const classified = classifyProviderError(err);
+      console.error("[copilot] AI provider call failed", {
+        provider: providerName,
+        code: classified.code,
+        status: classified.status,
+        message: classified.message,
+      });
       return jsonResponse({ error: PROVIDER_UNAVAILABLE_MESSAGE }, 502);
     }
     console.log("[debug] provider responded", {

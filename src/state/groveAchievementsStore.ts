@@ -101,3 +101,24 @@ export async function listRecentPublishedAchievements(
   if (error) throw new Error(error.message);
   return (data ?? []) as PublishedAchievement[];
 }
+
+// Which of these ids are STILL a real, currently-published Achievement —
+// used by the Community Feed (see FeedPostCard.tsx) to decide whether a
+// post's achievement_title/evidence_id is still safe to link. A feed
+// post's evidence_id is a snapshot taken at publish time (see
+// Seed.tsx's handleOpenShareForEvidence); if the candidate later
+// unpublished or deleted that Achievement, this id no longer resolves to
+// a row here, and the caller falls back to plain, unlinked text rather
+// than a dead anchor — see this function's only caller for that logic.
+export async function listExistingAchievementIds(
+  ids: string[],
+): Promise<Set<string>> {
+  if (ids.length === 0) return new Set();
+  const { data, error } = await supabase
+    .from("grove_achievements")
+    .select("id")
+    .in("id", ids);
+
+  if (error) throw new Error(error.message);
+  return new Set(((data ?? []) as { id: string }[]).map((row) => row.id));
+}

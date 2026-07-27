@@ -179,12 +179,6 @@ export default function RecruiterCandidateProfile() {
       isPreview={false}
       onTogglePreview={() => {}}
       onShare={() => {}}
-      editOpen={false}
-      onOpenEdit={() => {}}
-      onCloseEdit={() => {}}
-      onSaveProfile={async () => {}}
-      onEditProfessionalDetails={() => {}}
-      readOnlyProfile
       toast={null}
     />
   );

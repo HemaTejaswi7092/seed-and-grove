@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { motion } from "framer-motion";
-import { X, Check } from "lucide-react";
+import { X, Check, ChevronDown, ChevronRight } from "lucide-react";
 import { ACHIEVEMENT_TYPES } from "../../types/seed";
 import type { AchievementType, AchievementVisibility } from "../../types/seed";
 import type { CreateAchievementInput } from "../../state/seedStore";
@@ -76,6 +76,10 @@ export default function AchievementReviewModal({
   const [visibility, setVisibility] = useState(initial.visibility);
   const [status, setStatus] = useState<"idle" | "saving" | "error">("idle");
   const [errorText, setErrorText] = useState<string | null>(null);
+  // Collapsed by default so creating an achievement only ever asks for
+  // the essentials — editing an existing record starts expanded since
+  // there's usually already-meaningful data back there worth seeing.
+  const [detailsOpen, setDetailsOpen] = useState(mode === "edit");
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -155,55 +159,7 @@ export default function AchievementReviewModal({
               onChange={(event) => setShortDescription(event.target.value)}
               rows={2}
               className={`${inputClasses} resize-none`}
-              placeholder="What did you build?"
-            />
-          </label>
-
-          <label className="block">
-            <span className={labelClasses}>Achievement type</span>
-            <select
-              value={achievementType}
-              onChange={(event) =>
-                setAchievementType(event.target.value as AchievementType)
-              }
-              className={inputClasses}
-            >
-              {ACHIEVEMENT_TYPES.map((type) => (
-                <option key={type} value={type}>
-                  {TYPE_LABELS[type]}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-            <label className="block">
-              <span className={labelClasses}>Skills demonstrated</span>
-              <input
-                value={skillsDemonstrated}
-                onChange={(event) => setSkillsDemonstrated(event.target.value)}
-                className={inputClasses}
-                placeholder="SQL, Data Modeling"
-              />
-            </label>
-            <label className="block">
-              <span className={labelClasses}>Technologies used</span>
-              <input
-                value={technologiesUsed}
-                onChange={(event) => setTechnologiesUsed(event.target.value)}
-                className={inputClasses}
-                placeholder="PostgreSQL, Power BI"
-              />
-            </label>
-          </div>
-
-          <label className="block">
-            <span className={labelClasses}>Project domain</span>
-            <input
-              value={projectDomain}
-              onChange={(event) => setProjectDomain(event.target.value)}
-              className={inputClasses}
-              placeholder="E-commerce Analytics"
+              placeholder="What did you build or accomplish?"
             />
           </label>
 
@@ -229,35 +185,13 @@ export default function AchievementReviewModal({
             />
           </label>
 
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-            <label className="block">
-              <span className={labelClasses}>Proof link (optional)</span>
-              <input
-                value={proofUrl}
-                onChange={(event) => setProofUrl(event.target.value)}
-                type="url"
-                className={inputClasses}
-                placeholder="https://github.com/..."
-              />
-            </label>
-            <label className="block">
-              <span className={labelClasses}>Proof label (optional)</span>
-              <input
-                value={proofLabel}
-                onChange={(event) => setProofLabel(event.target.value)}
-                className={inputClasses}
-                placeholder="GitHub repository"
-              />
-            </label>
-          </div>
-
           <label className="block">
-            <span className={labelClasses}>Relevant roles</span>
+            <span className={labelClasses}>Skills demonstrated</span>
             <input
-              value={relevantRoles}
-              onChange={(event) => setRelevantRoles(event.target.value)}
+              value={skillsDemonstrated}
+              onChange={(event) => setSkillsDemonstrated(event.target.value)}
               className={inputClasses}
-              placeholder="Data Analyst, BI Developer"
+              placeholder="SQL, Data Modeling"
             />
           </label>
 
@@ -289,6 +223,94 @@ export default function AchievementReviewModal({
                 Publish to Grove
               </button>
             </div>
+          </div>
+
+          <div className="border-t border-border pt-5">
+            <button
+              type="button"
+              onClick={() => setDetailsOpen((open) => !open)}
+              className="flex items-center gap-1.5 text-xs font-medium tracking-wide text-ink-faint uppercase transition-colors hover:text-ink"
+            >
+              {detailsOpen ? (
+                <ChevronDown className="h-3.5 w-3.5" strokeWidth={2} />
+              ) : (
+                <ChevronRight className="h-3.5 w-3.5" strokeWidth={2} />
+              )}
+              More Details (Optional)
+            </button>
+
+            {detailsOpen && (
+              <div className="mt-4 space-y-5">
+                <label className="block">
+                  <span className={labelClasses}>Achievement type</span>
+                  <select
+                    value={achievementType}
+                    onChange={(event) =>
+                      setAchievementType(event.target.value as AchievementType)
+                    }
+                    className={inputClasses}
+                  >
+                    {ACHIEVEMENT_TYPES.map((type) => (
+                      <option key={type} value={type}>
+                        {TYPE_LABELS[type]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="block">
+                  <span className={labelClasses}>Technologies used</span>
+                  <input
+                    value={technologiesUsed}
+                    onChange={(event) => setTechnologiesUsed(event.target.value)}
+                    className={inputClasses}
+                    placeholder="PostgreSQL, Power BI"
+                  />
+                </label>
+
+                <label className="block">
+                  <span className={labelClasses}>Project domain</span>
+                  <input
+                    value={projectDomain}
+                    onChange={(event) => setProjectDomain(event.target.value)}
+                    className={inputClasses}
+                    placeholder="E-commerce Analytics"
+                  />
+                </label>
+
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                  <label className="block">
+                    <span className={labelClasses}>Proof link</span>
+                    <input
+                      value={proofUrl}
+                      onChange={(event) => setProofUrl(event.target.value)}
+                      type="url"
+                      className={inputClasses}
+                      placeholder="https://github.com/..."
+                    />
+                  </label>
+                  <label className="block">
+                    <span className={labelClasses}>Proof label</span>
+                    <input
+                      value={proofLabel}
+                      onChange={(event) => setProofLabel(event.target.value)}
+                      className={inputClasses}
+                      placeholder="GitHub repository"
+                    />
+                  </label>
+                </div>
+
+                <label className="block">
+                  <span className={labelClasses}>Relevant roles</span>
+                  <input
+                    value={relevantRoles}
+                    onChange={(event) => setRelevantRoles(event.target.value)}
+                    className={inputClasses}
+                    placeholder="Data Analyst, BI Developer"
+                  />
+                </label>
+              </div>
+            )}
           </div>
 
           {status === "error" && errorText && (
