@@ -1,31 +1,31 @@
-import { detectSeedDomain } from "../lib/seedDomain";
 import type {
   Achievement,
   AchievementType,
   AchievementVisibility,
-  DraftSeedInput,
   Seed,
   SeedActivityItem,
   SeedConversationMessage,
-  SeedStage,
   TimelineEvent,
   TimelineEventType,
 } from "../types/seed";
 
-// Temporary local persistence layer — Seeds and their achievements aren't
-// in Supabase yet (see task scope). The one exception is PUBLISHED
-// achievements: once a candidate publishes one, state/achievements.ts also
-// writes a copy into the grove_achievements Postgres table (see that file
-// and supabase/grove_achievements.sql) — this file only ever manages the
-// local mirror. Everything here is keyed per authenticated userId, so
-// different accounts signing in on the same browser never see each
-// other's Seeds, and every record carries its own id so nothing is ever
-// shared globally across workspaces. This is the ONLY place local Seed
-// data is read from or written to — no component should reach into
+// Local-only persistence layer — deliberately narrow. The Seed record
+// itself now lives in Postgres (see state/seedsStore.ts and
+// supabase/seeds.sql) — this file only ever held it as a stopgap before
+// that table existed, and every workspace/list read now goes through
+// seedsStore.ts instead. What's still genuinely local, by design, and
+// stays here: the Copilot chat transcript, the free-form activity log
+// (Copilot context, not the Timeline tab), the Timeline tab's own events,
+// and DRAFT (unpublished) Achievements — none of these have a Postgres
+// home, and a published Achievement's public copy already lives in
+// grove_achievements (see state/achievements.ts). Everything here is
+// keyed per authenticated userId, so different accounts signing in on the
+// same browser never see each other's data, and every record carries its
+// own id so nothing is ever shared globally. This is the ONLY place this
+// local data is read from or written to — no component should reach into
 // localStorage itself.
 
 interface UserSeedData {
-  seeds: Seed[];
   activity: SeedActivityItem[];
   achievements: Achievement[];
   messages: SeedConversationMessage[];
@@ -33,18 +33,10 @@ interface UserSeedData {
 }
 
 const EMPTY_DATA: UserSeedData = {
-  seeds: [],
   activity: [],
   achievements: [],
   messages: [],
   timeline: [],
-};
-
-const stageToStatus: Record<SeedStage, string> = {
-  Idea: "Just Started",
-  Planning: "Planning",
-  Building: "Currently Building",
-  Scaling: "Scaling",
 };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -54,22 +46,11 @@ function storageKey(userId: string): string {
 }
 
 // --- Backfill ---------------------------------------------------------------
-// Every field added to Seed/Achievement after their first release lands
-// here, so records created before that field existed still load correctly
-// instead of rendering `undefined`. Runs on every load() — cheap for the
-// data sizes this app deals with, and keeps the schema evolution entirely
+// Every field added to Achievement after its first release lands here, so
+// records created before that field existed still load correctly instead
+// of rendering `undefined`. Runs on every load() — cheap for the data
+// sizes this app deals with, and keeps the schema evolution entirely
 // inside this file rather than scattered across every reader.
-
-function backfillSeed(seed: Seed): Seed {
-  return {
-    ...seed,
-    technologies: seed.technologies ?? [],
-    lifecycleStatus: seed.lifecycleStatus ?? "in_progress",
-    completedAt: seed.completedAt ?? null,
-    repoUrl: seed.repoUrl ?? "",
-    demoUrl: seed.demoUrl ?? "",
-  };
-}
 
 function backfillAchievement(achievement: Achievement): Achievement {
   // Achievement ids must be real UUIDs — they double as the
@@ -105,7 +86,6 @@ function load(userId: string): UserSeedData {
       evidence?: Achievement[];
     };
     return {
-      seeds: (parsed.seeds ?? []).map(backfillSeed),
       activity: parsed.activity ?? [],
       achievements: (parsed.achievements ?? parsed.evidence ?? []).map(
         backfillAchievement,
@@ -122,7 +102,8 @@ function save(userId: string, data: UserSeedData): void {
   try {
     localStorage.setItem(storageKey(userId), JSON.stringify(data));
   } catch {
-    // localStorage unavailable — Seeds just won't persist across reloads.
+    // localStorage unavailable — this local-only data just won't persist
+    // across reloads; the Seed record itself (Postgres) is unaffected.
   }
 }
 
@@ -130,96 +111,17 @@ function generateId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
-// Pushes onto an already-`load()`ed data object without its own save() —
-// every call site below is already mid-mutation inside one of this
-// file's writers and calls save(userId, data) itself once, afterward.
-// Keeps a project-lifecycle event and the write that caused it in the
-// same localStorage transaction instead of a separate read/write
-// round-trip. See addTimelineEvent below for the standalone version
-// other files (state/achievements.ts, CopilotChat.tsx) use.
-function pushTimelineEvent(
-  data: UserSeedData,
-  seedId: string,
-  type: TimelineEventType,
-  detail?: string,
-): TimelineEvent {
-  const event: TimelineEvent = {
-    id: generateId("timeline"),
-    seedId,
-    type,
-    detail: detail ?? null,
-    createdAt: new Date().toISOString(),
-  };
-  data.timeline.push(event);
-  return event;
-}
-
 function welcomeMessageFor(seed: Seed): SeedConversationMessage {
-  const isKnn = detectSeedDomain(seed) === "knn";
-  const content = isKnn
-    ? `Your "${seed.title}" Seed is ready. I can help you plan the project, write the implementation, understand KNN, debug errors, and evaluate the model. What would you like to begin with?`
-    : `Your "${seed.title}" Seed is ready. Tell me what you're planning to build, what you've completed so far, or where you need help.`;
   return {
     id: generateId("msg"),
     seedId: seed.id,
     role: "ai",
-    content,
+    content: `Your "${seed.title}" Seed is ready. Tell me what you're planning to build, what you've completed so far, or where you need help.`,
     createdAt: seed.createdAt,
   };
 }
 
-function parseCommaList(text: string): string[] {
-  return text
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-// --- Legacy migration -----------------------------------------------------
-// An earlier version of this feature stored a single, unnamed "draft" Seed
-// per user in sessionStorage (no id, no isolation from other Seeds). If one
-// exists and this user has no Seeds in the real store yet, convert it into
-// a proper, isolated Seed record once, then remove the legacy entry.
-function legacyDraftKey(userId: string): string {
-  return `seedAndGroveDraftSeed:${userId}`;
-}
-
-function migrateLegacyDraft(userId: string): Seed | null {
-  try {
-    const raw = sessionStorage.getItem(legacyDraftKey(userId));
-    if (!raw) return null;
-    const legacy = JSON.parse(raw) as DraftSeedInput;
-    sessionStorage.removeItem(legacyDraftKey(userId));
-    return createSeedRecord(userId, {
-      title: legacy.name?.trim() || "Untitled Seed",
-      description: legacy.description?.trim() || legacy.goal?.trim() || "",
-      sourceType: "manual",
-      status: stageToStatus[legacy.stage] ?? "Just Started",
-      technologies: parseCommaList(legacy.technologies ?? ""),
-    });
-  } catch {
-    return null;
-  }
-}
-
 // --- Reads ------------------------------------------------------------------
-
-export function listSeeds(userId: string): Seed[] {
-  const data = load(userId);
-  if (data.seeds.length === 0) {
-    const migrated = migrateLegacyDraft(userId);
-    if (migrated) return [migrated];
-  }
-  return data.seeds;
-}
-
-// Ownership is enforced here: a lookup only ever returns a Seed that lives
-// in *this* userId's own storage bucket. A missing or foreign seedId both
-// simply resolve to null — the caller can't tell the difference, which is
-// the point (no leaking whether a Seed exists for someone else).
-export function getSeed(userId: string, seedId: string): Seed | null {
-  return listSeeds(userId).find((seed) => seed.id === seedId) ?? null;
-}
 
 export function getSeedActivity(
   userId: string,
@@ -252,57 +154,24 @@ export function getSeedMessages(
   return load(userId).messages.filter((item) => item.seedId === seedId);
 }
 
-// --- Writes -----------------------------------------------------------------
-
-function createSeedRecord(
-  userId: string,
-  input: {
-    title: string;
-    description: string;
-    sourceType: Seed["sourceType"];
-    status: string;
-    technologies: string[];
-  },
-): Seed {
-  const data = load(userId);
-  const now = new Date().toISOString();
-  const seed: Seed = {
-    id: generateId("seed"),
-    userId,
-    title: input.title,
-    description: input.description,
-    sourceType: input.sourceType,
-    status: input.status,
-    technologies: input.technologies,
-    createdAt: now,
-    updatedAt: now,
-    // No defined setup-completion rule exists yet, so a brand-new Seed
-    // always starts at 0% — never inherited or estimated.
-    progress: 0,
-    // Never published on creation — publishing is a deliberate, separate
-    // act from the Seed Workspace (see setSeedPublished below).
-    isPublished: false,
-    publishedAt: null,
-    lifecycleStatus: "in_progress",
-    completedAt: null,
-    repoUrl: "",
-    demoUrl: "",
-  };
-  data.seeds.push(seed);
-  data.messages.push(welcomeMessageFor(seed));
-  pushTimelineEvent(data, seed.id, "project_created");
-  save(userId, data);
-  return seed;
+export function getSeedTimeline(userId: string, seedId: string): TimelineEvent[] {
+  return load(userId).timeline.filter((item) => item.seedId === seedId);
 }
 
-export function createSeed(userId: string, draft: DraftSeedInput): Seed {
-  return createSeedRecord(userId, {
-    title: draft.name.trim() || "Untitled Seed",
-    description: draft.description.trim() || draft.goal.trim(),
-    sourceType: "manual",
-    status: stageToStatus[draft.stage],
-    technologies: parseCommaList(draft.technologies),
-  });
+// --- Writes -----------------------------------------------------------------
+
+// Called once, right after state/seedsStore.ts's createSeed() succeeds
+// (see state/seedPublishing.ts's createSeedAndSync) — seeds the welcome
+// Copilot message and the "project_created" Timeline event for a
+// brand-new Seed. Never called on its own; a Seed with no local record
+// yet (e.g. right after being created on another device) simply has no
+// welcome message/timeline entries here until this device creates them,
+// which is fine — neither is essential workspace data.
+export function initializeLocalSeedRecord(seed: Seed): void {
+  const data = load(seed.userId);
+  data.messages.push(welcomeMessageFor(seed));
+  pushTimelineEvent(data, seed.id, "project_created");
+  save(seed.userId, data);
 }
 
 export function addSeedMessage(
@@ -343,9 +212,30 @@ export function addSeedActivity(
   return item;
 }
 
-// Standalone version of pushTimelineEvent, for callers outside this file
-// that don't already have a load()ed UserSeedData to append to (see
-// state/achievements.ts, CopilotChat.tsx).
+// Pushes onto an already-`load()`ed data object without its own save() —
+// used by initializeLocalSeedRecord above, which is already mid-mutation
+// and calls save(userId, data) itself once, afterward. Keeps a
+// project-lifecycle event and the write that caused it in the same
+// localStorage transaction instead of a separate read/write round-trip.
+// See addTimelineEvent below for the standalone version other files
+// (state/seedPublishing.ts, state/achievements.ts, CopilotChat.tsx) use.
+function pushTimelineEvent(
+  data: UserSeedData,
+  seedId: string,
+  type: TimelineEventType,
+  detail?: string,
+): TimelineEvent {
+  const event: TimelineEvent = {
+    id: generateId("timeline"),
+    seedId,
+    type,
+    detail: detail ?? null,
+    createdAt: new Date().toISOString(),
+  };
+  data.timeline.push(event);
+  return event;
+}
+
 export function addTimelineEvent(
   userId: string,
   seedId: string,
@@ -356,10 +246,6 @@ export function addTimelineEvent(
   const event = pushTimelineEvent(data, seedId, type, detail);
   save(userId, data);
   return event;
-}
-
-export function getSeedTimeline(userId: string, seedId: string): TimelineEvent[] {
-  return load(userId).timeline.filter((item) => item.seedId === seedId);
 }
 
 // --- Achievements (local half — see state/achievements.ts for the public,
@@ -461,112 +347,16 @@ export function deleteSeedAchievement(
   return true;
 }
 
-// --- Publishing (Seed Workspace territory) -----------------------------
-// The Grove is a read-only presentation layer over these two flags — it
-// never sets them itself. These setters exist for the Seed Workspace /
-// achievement panel to call once that UI is built; nothing wires them up yet.
-
-export function setSeedPublished(
-  userId: string,
-  seedId: string,
-  isPublished: boolean,
-): Seed | null {
+// Local cleanup only, called when a Seed is deleted (see
+// state/seedPublishing.ts's deleteSeedAndSync) — removes this device's
+// local activity/messages/timeline/draft-achievements for that seedId.
+// Never the only cleanup step: published Achievements and the Seed's own
+// grove_seeds/feed_posts rows are Postgres's job, not this file's.
+export function clearLocalSeedData(userId: string, seedId: string): void {
   const data = load(userId);
-  const seed = data.seeds.find((item) => item.id === seedId);
-  if (!seed) return null;
-  const wasPublished = seed.isPublished;
-  const now = new Date().toISOString();
-  seed.isPublished = isPublished;
-  seed.publishedAt = isPublished ? now : null;
-  seed.updatedAt = now;
-  // Only the private→published transition is a Timeline-worthy moment —
-  // unpublishing isn't in the recorded event list (see types/seed.ts).
-  if (isPublished && !wasPublished) {
-    pushTimelineEvent(data, seed.id, "project_published");
-  }
+  data.activity = data.activity.filter((item) => item.seedId !== seedId);
+  data.achievements = data.achievements.filter((item) => item.seedId !== seedId);
+  data.messages = data.messages.filter((item) => item.seedId !== seedId);
+  data.timeline = data.timeline.filter((item) => item.seedId !== seedId);
   save(userId, data);
-  return seed;
-}
-
-export function getPublishedSeeds(userId: string): Seed[] {
-  return listSeeds(userId).filter((seed) => seed.isPublished);
-}
-
-export function updateSeedLinks(
-  userId: string,
-  seedId: string,
-  links: { repoUrl: string; demoUrl: string },
-): Seed | null {
-  const data = load(userId);
-  const seed = data.seeds.find((item) => item.id === seedId);
-  if (!seed) return null;
-  const hadRepo = Boolean(seed.repoUrl);
-  const hadDemo = Boolean(seed.demoUrl);
-  seed.repoUrl = links.repoUrl.trim();
-  seed.demoUrl = links.demoUrl.trim();
-  seed.updatedAt = new Date().toISOString();
-  // Only the empty→filled transition for each link is Timeline-worthy —
-  // editing an already-set link is exactly the "minor edit" the Timeline
-  // spec says not to record.
-  if (!hadRepo && seed.repoUrl) pushTimelineEvent(data, seed.id, "repo_linked");
-  if (!hadDemo && seed.demoUrl) pushTimelineEvent(data, seed.id, "demo_linked");
-  save(userId, data);
-  return seed;
-}
-
-// --- Project lifecycle ------------------------------------------------
-// Four explicit, candidate-triggered transitions — nothing here is ever
-// called automatically from AI messages, achievement counts, or the
-// (currently unused) progress field. The Seed Workspace's "Mark Project as
-// Complete" button calls completeSeed only after the candidate confirms
-// the review checklist; "Reopen Project" and the Archive/Unarchive
-// overflow action call the other three directly.
-
-export function completeSeed(userId: string, seedId: string): Seed | null {
-  const data = load(userId);
-  const seed = data.seeds.find((item) => item.id === seedId);
-  if (!seed) return null;
-  const now = new Date().toISOString();
-  seed.lifecycleStatus = "completed";
-  seed.completedAt = now;
-  seed.updatedAt = now;
-  pushTimelineEvent(data, seed.id, "project_completed");
-  save(userId, data);
-  return seed;
-}
-
-export function reopenSeed(userId: string, seedId: string): Seed | null {
-  const data = load(userId);
-  const seed = data.seeds.find((item) => item.id === seedId);
-  if (!seed) return null;
-  seed.lifecycleStatus = "in_progress";
-  seed.completedAt = null;
-  seed.updatedAt = new Date().toISOString();
-  pushTimelineEvent(data, seed.id, "project_reopened");
-  save(userId, data);
-  return seed;
-}
-
-export function archiveSeed(userId: string, seedId: string): Seed | null {
-  const data = load(userId);
-  const seed = data.seeds.find((item) => item.id === seedId);
-  if (!seed) return null;
-  seed.lifecycleStatus = "archived";
-  seed.updatedAt = new Date().toISOString();
-  save(userId, data);
-  return seed;
-}
-
-// Always returns to "in_progress" — this is a flat three-state enum (see
-// LifecycleStatus), so unarchiving can't distinguish "was completed before
-// archiving" from "was in progress"; re-completing is one click away via
-// Mark Project as Complete if that's the case.
-export function unarchiveSeed(userId: string, seedId: string): Seed | null {
-  const data = load(userId);
-  const seed = data.seeds.find((item) => item.id === seedId);
-  if (!seed) return null;
-  seed.lifecycleStatus = "in_progress";
-  seed.updatedAt = new Date().toISOString();
-  save(userId, data);
-  return seed;
 }

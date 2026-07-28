@@ -4,7 +4,7 @@ import { isDemoAccount } from "../config/demoAccount";
 import { getDisplayName } from "../lib/displayName";
 import { getInitials } from "../lib/initials";
 import { getCandidateProfile } from "../state/candidateProfileStore";
-import { getPublishedSeeds, listSeeds } from "../state/seedStore";
+import { listSeeds } from "../state/seedsStore";
 import {
   listPublishedAchievements,
   listExistingAchievementIds,
@@ -30,6 +30,7 @@ import FeedEmptyState from "../components/dashboard/FeedEmptyState";
 import FeedPostCard from "../components/dashboard/FeedPostCard";
 import GlobalSearchBar from "../components/dashboard/GlobalSearchBar";
 import type { FeedPost } from "../types/feed";
+import type { Seed } from "../types/seed";
 
 // The Dashboard is the public activity feed — a 3-column layout (Grove
 // summary / feed / suggestions) that collapses to a single column on
@@ -53,6 +54,7 @@ export default function Dashboard() {
     PublishedAchievementWithSeed[]
   >([]);
   const [headline, setHeadline] = useState("");
+  const [seeds, setSeeds] = useState<Seed[]>([]);
 
   useEffect(() => {
     if (isDemo || !user) return;
@@ -102,21 +104,32 @@ export default function Dashboard() {
   useEffect(() => {
     if (isDemo || !user) return;
     let cancelled = false;
-    listPublishedAchievements(user.id)
-      .then((rows) => {
+    // Seeds fetched from Postgres (state/seedsStore.ts), not localStorage —
+    // same cross-device fix as Grove.tsx: joining published Achievements
+    // against a browser-local Seed list silently dropped them on any
+    // device other than the one that created the Seed.
+    Promise.all([listPublishedAchievements(user.id), listSeeds(user.id)])
+      .then(([achievementRows, seedRows]) => {
         if (cancelled) return;
-        const seedById = new Map(listSeeds(user.id).map((seed) => [seed.id, seed]));
+        setSeeds(seedRows);
+        const seedById = new Map(seedRows.map((seed) => [seed.id, seed]));
         setOwnAchievements(
-          rows
-            .map((achievement) => {
-              const seed = seedById.get(achievement.project_id);
-              return seed ? { achievement, seed: { id: seed.id, title: seed.title } } : null;
-            })
-            .filter((item): item is PublishedAchievementWithSeed => item !== null),
+          achievementRows.map((achievement) => {
+            const seed = seedById.get(achievement.project_id);
+            return {
+              achievement,
+              seed: seed
+                ? { id: seed.id, title: seed.title }
+                : { id: achievement.project_id, title: achievement.project_domain || "Project" },
+            };
+          }),
         );
       })
       .catch(() => {
-        if (!cancelled) setOwnAchievements([]);
+        if (!cancelled) {
+          setOwnAchievements([]);
+          setSeeds([]);
+        }
       });
     return () => {
       cancelled = true;
@@ -190,10 +203,10 @@ export default function Dashboard() {
     );
     skillsCount = demoSkillSummaries.length;
   } else {
-    // ownAchievements loads asynchronously (see the effect above) — counts
-    // simply start at 0 and fill in once it resolves, same brief-loading
-    // tradeoff as the feed list below.
-    publishedSeedsCount = getPublishedSeeds(user.id).length;
+    // seeds/ownAchievements load asynchronously (see the effect above) —
+    // counts simply start at 0 and fill in once it resolves, same brief-
+    // loading tradeoff as the feed list below.
+    publishedSeedsCount = seeds.filter((seed) => seed.isPublished).length;
     publicEvidenceCount = ownAchievements.length;
     skillsCount = deriveSkillsFromAchievements(ownAchievements).length;
   }

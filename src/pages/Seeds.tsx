@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Sprout, FolderGit2 } from "lucide-react";
+import { Sprout, FolderGit2, Globe } from "lucide-react";
 import { useActiveProject } from "../auth/useActiveProject";
 import { getInitials } from "../lib/initials";
 import type { SeedSourceType } from "../types/seed";
@@ -13,7 +13,7 @@ const sourceLabel: Record<SeedSourceType, string> = {
 };
 
 export default function Seeds() {
-  const { seeds, activeSeed } = useActiveProject();
+  const { seeds, activeSeed, loading, error } = useActiveProject();
   const hasSeeds = seeds.length > 0;
 
   return (
@@ -37,7 +37,15 @@ export default function Seeds() {
         )}
       </div>
 
-      {hasSeeds ? (
+      {error && (
+        <p className="mt-6 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</p>
+      )}
+
+      {loading ? (
+        <div className="mt-8 flex items-center justify-center rounded-3xl border border-dashed border-ink-faint/40 bg-canvas-elevated px-6 py-16">
+          <p className="text-sm text-ink-faint">Loading your Seeds…</p>
+        </div>
+      ) : hasSeeds ? (
         <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
           {seeds.map((seed, index) => (
             <motion.div
@@ -59,6 +67,12 @@ export default function Seeds() {
                     {getInitials(seed.title)}
                   </div>
                   <div className="flex items-center gap-1.5">
+                    {seed.isPublished && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent-dark">
+                        <Globe className="h-2.5 w-2.5" strokeWidth={2.5} />
+                        Published
+                      </span>
+                    )}
                     {seed.lifecycleStatus === "completed" && (
                       <span className="rounded-full bg-ink px-2 py-0.5 text-[11px] font-medium text-white">
                         Completed

@@ -12,6 +12,8 @@ import {
   Link2,
   X,
   Plus,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { getInitials } from "../../lib/initials";
 import { useMenuDismissRef } from "../../lib/useMenuDismiss";
@@ -61,6 +63,20 @@ interface ProjectHeaderProps {
   // has its own built-in manual-add entry point too, for when AI
   // suggestions are unavailable or insufficient at completion time.
   onAddAchievement?: () => void;
+  // Edits title/description/technologies — the Seed's core metadata,
+  // independent of lifecycle/publish state. Re-syncs the Grove mirror
+  // itself (see state/seedPublishing.ts's updateSeedDetailsAndSync) if
+  // this Seed is already published, so an edit never needs a second,
+  // separate "update Grove" step.
+  onEditSeed?: (details: {
+    title: string;
+    description: string;
+    technologies: string[];
+  }) => Promise<void>;
+  // Opens the delete confirmation — Seed.tsx owns the actual confirm
+  // dialog/delete call, same split as onCompleteProject/
+  // onOpenCompletionWorkflow above.
+  onRequestDelete?: () => void;
 }
 
 export default function ProjectHeader({
@@ -76,9 +92,12 @@ export default function ProjectHeader({
   onUnarchiveProject,
   onSaveLinks,
   onAddAchievement,
+  onEditSeed,
+  onRequestDelete,
 }: ProjectHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [linksModalOpen, setLinksModalOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
   const menuRef = useMenuDismissRef<HTMLDivElement>(menuOpen, () => setMenuOpen(false));
   const isArchived = seed.lifecycleStatus === "archived";
   const isCompleted = seed.lifecycleStatus === "completed";
@@ -181,7 +200,7 @@ export default function ProjectHeader({
             </button>
           )}
 
-          {(onArchiveProject || onUnarchiveProject) && (
+          {(onArchiveProject || onUnarchiveProject || onEditSeed || onRequestDelete) && (
             <div className="relative" ref={menuOpen ? menuRef : undefined}>
               <button
                 type="button"
@@ -193,6 +212,19 @@ export default function ProjectHeader({
               </button>
               {menuOpen && (
                 <div className="absolute right-0 z-50 mt-1 w-44 overflow-hidden rounded-xl border border-border bg-canvas-elevated shadow-lg">
+                  {onEditSeed && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        setEditModalOpen(true);
+                      }}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-ink-soft transition-colors hover:bg-accent-soft hover:text-ink"
+                    >
+                      <Pencil className="h-3.5 w-3.5" strokeWidth={2} />
+                      Edit Seed
+                    </button>
+                  )}
                   {!isArchived && onArchiveProject && (
                     <button
                       type="button"
@@ -217,6 +249,19 @@ export default function ProjectHeader({
                     >
                       <ArchiveRestore className="h-3.5 w-3.5" strokeWidth={2} />
                       Unarchive project
+                    </button>
+                  )}
+                  {onRequestDelete && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        onRequestDelete();
+                      }}
+                      className="flex w-full items-center gap-2 border-t border-border px-3 py-2 text-left text-xs font-medium text-red-600 transition-colors hover:bg-red-50"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" strokeWidth={2} />
+                      Delete Seed
                     </button>
                   )}
                 </div>
@@ -290,6 +335,143 @@ export default function ProjectHeader({
           }}
         />
       )}
+
+      {editModalOpen && onEditSeed && (
+        <EditSeedModal
+          title={seed.title}
+          description={seed.description}
+          technologies={seed.technologies}
+          onClose={() => setEditModalOpen(false)}
+          onSave={async (details) => {
+            await onEditSeed(details);
+            setEditModalOpen(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function EditSeedModal({
+  title,
+  description,
+  technologies,
+  onClose,
+  onSave,
+}: {
+  title: string;
+  description: string;
+  technologies: string[];
+  onClose: () => void;
+  onSave: (details: {
+    title: string;
+    description: string;
+    technologies: string[];
+  }) => Promise<void>;
+}) {
+  const [name, setName] = useState(title);
+  const [desc, setDesc] = useState(description);
+  const [tech, setTech] = useState(technologies.join(", "));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    if (saving) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await onSave({
+        title: name.trim() || "Untitled Seed",
+        description: desc.trim(),
+        technologies: tech
+          .split(",")
+          .map((item) => item.trim())
+          .filter(Boolean),
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't save these changes.");
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-ink/30 px-4 py-10 backdrop-blur-sm"
+      onClick={saving ? undefined : onClose}
+    >
+      <div
+        onClick={(event) => event.stopPropagation()}
+        className="w-full max-w-md rounded-2xl border border-border bg-canvas-elevated p-6 shadow-[0_24px_64px_-24px_rgba(26,28,25,0.4)]"
+      >
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-ink">Edit Seed</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            aria-label="Close"
+            className="flex h-7 w-7 items-center justify-center rounded-full text-ink-soft transition-colors hover:bg-accent-soft hover:text-ink disabled:opacity-50"
+          >
+            <X className="h-4 w-4" strokeWidth={2} />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="mt-4 space-y-3">
+          <label className="block">
+            <span className="text-xs font-medium tracking-wide text-ink-faint uppercase">
+              Seed name
+            </span>
+            <input
+              required
+              className="mt-1.5 w-full rounded-lg border border-border bg-canvas px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </label>
+          <label className="block">
+            <span className="text-xs font-medium tracking-wide text-ink-faint uppercase">
+              Description
+            </span>
+            <textarea
+              rows={3}
+              className="mt-1.5 w-full resize-none rounded-lg border border-border bg-canvas px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none"
+              value={desc}
+              onChange={(e) => setDesc(e.target.value)}
+            />
+          </label>
+          <label className="block">
+            <span className="text-xs font-medium tracking-wide text-ink-faint uppercase">
+              Technologies (comma-separated)
+            </span>
+            <input
+              className="mt-1.5 w-full rounded-lg border border-border bg-canvas px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none"
+              placeholder="e.g. Python, React, PyTorch"
+              value={tech}
+              onChange={(e) => setTech(e.target.value)}
+            />
+          </label>
+          {error && (
+            <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">{error}</p>
+          )}
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={saving}
+              className="rounded-full border border-border px-4 py-2 text-xs font-medium text-ink-soft transition-colors hover:border-ink-faint hover:text-ink disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="rounded-full bg-accent px-4 py-2 text-xs font-medium text-white shadow-sm shadow-accent/20 transition-colors hover:bg-accent-dark disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {saving ? "Saving…" : "Save changes"}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

@@ -23,6 +23,32 @@ export async function createFeedPost(
   return data as FeedPost;
 }
 
+// Deleting a Seed must not leave orphaned feed activity behind — removes
+// every post that's either directly about the Seed itself (seed_id
+// matches, e.g. a "started/completed this project" post) or about one of
+// its now-deleted Achievements (evidence_id matches). See
+// state/seedPublishing.ts's deleteSeedAndSync, the only caller. Scoped to
+// userId too even though RLS already enforces ownership — belt-and-
+// suspenders, and it lets Postgres use the existing user index.
+export async function deleteFeedPostsForSeed(
+  userId: string,
+  seedId: string,
+  achievementIds: string[],
+): Promise<void> {
+  const orFilter = [
+    `seed_id.eq.${seedId}`,
+    ...achievementIds.map((id) => `evidence_id.eq.${id}`),
+  ].join(",");
+
+  const { error } = await supabase
+    .from("feed_posts")
+    .delete()
+    .eq("user_id", userId)
+    .or(orFilter);
+
+  if (error) throw new Error(error.message);
+}
+
 // The public, cross-user feed — RLS already restricts this to
 // visibility = 'public' rows (plus the caller's own, but we don't need
 // that distinction here), this filter just makes the query's intent

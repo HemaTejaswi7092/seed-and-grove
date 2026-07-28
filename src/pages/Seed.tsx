@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Navigate, useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Navigate, useNavigate, useParams } from "react-router-dom";
 import WorkspaceSidebar from "../components/workspace/WorkspaceSidebar";
 import WorkspaceTopbar from "../components/workspace/WorkspaceTopbar";
 import ProjectHeader from "../components/workspace/ProjectHeader";
@@ -25,13 +25,12 @@ import {
   demoTimelineEvents,
 } from "../data/mockData";
 import {
-  getSeed,
-  listSeeds,
   getSeedMessages,
   getSeedActivity,
   getSeedAchievements,
   getSeedTimeline,
 } from "../state/seedStore";
+import { getSeed, listSeeds } from "../state/seedsStore";
 import {
   setSeedPublishedAndSync,
   completeSeedAndSync,
@@ -39,6 +38,8 @@ import {
   archiveSeedAndSync,
   unarchiveSeedAndSync,
   updateSeedLinksAndSync,
+  updateSeedDetailsAndSync,
+  deleteSeedAndSync,
 } from "../state/seedPublishing";
 import { createAchievement, updateAchievement, deleteAchievement } from "../state/achievements";
 import { createFeedPost } from "../state/feedStore";
@@ -49,7 +50,7 @@ import { toDisplayAchievements } from "../lib/evidenceDisplay";
 import { getDisplayName } from "../lib/displayName";
 import type { WorkspaceTab } from "../components/workspace/tabs";
 import type { ProjectHeaderMetadataItem, EvidenceItem, SkillLevel } from "../types/mockData";
-import type { Achievement, SeedActivityItem } from "../types/seed";
+import type { Achievement, Seed as SeedType, SeedActivityItem } from "../types/seed";
 import type { FeedPostType, FeedPostVisibility } from "../types/feed";
 import type { EvidenceSuggestion } from "../services/ai/types";
 
@@ -87,11 +88,15 @@ function toFormValues(achievement: Achievement): AchievementReviewFormValues {
 
 export default function Seed() {
   const { seedId } = useParams<{ seedId: string }>();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("workspace");
-  // Bumped whenever the Copilot or an achievement/lifecycle action writes
-  // to the store, so this page re-reads it and everything downstream
+  // Bumped whenever the Copilot or an achievement action writes to the
+  // local store, so this page re-reads it and everything downstream
   // reflects it — these are plain reads at render time, not otherwise
-  // reactive to storage writes.
+  // reactive to storage writes. Seed-shell changes (publish, lifecycle,
+  // edit) no longer use this — they update `seed`/`seeds` state directly
+  // with the row the AndSync call already returned, since those are now
+  // fetched from Postgres, not re-read synchronously on every render.
   const [, forceRefresh] = useState(0);
   const [shareState, setShareState] = useState<ShareState | null>(null);
   const [editingAchievement, setEditingAchievement] = useState<Achievement | null>(null);
@@ -109,7 +114,47 @@ export default function Seed() {
   >(null);
   const [completionAiUnavailable, setCompletionAiUnavailable] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [deletingSeed, setDeletingSeed] = useState(false);
   const { user, profile } = useAuth();
+
+  const wantsDemoSeed = !!seedId && isDemoSeed(seedId);
+  const isDemo = wantsDemoSeed && !!user && isDemoAccount(user.email);
+
+  // seed: undefined = still loading, null = not found (or not owned — RLS
+  // makes the two indistinguishable, which is the point: no leaking
+  // whether a Seed exists for someone else). Fetched fresh from Postgres
+  // (state/seedsStore.ts) on every visit — this is the actual fix for
+  // "the Seed doesn't appear in the Workspace on another device": that
+  // table has no concept of "which browser," only "which account."
+  const [seed, setSeed] = useState<SeedType | null | undefined>(
+    isDemo ? DEMO_SEED : undefined,
+  );
+  const [seeds, setSeeds] = useState<SeedType[]>(isDemo ? [DEMO_SEED] : []);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user || !seedId || isDemo) return;
+    let cancelled = false;
+    Promise.all([getSeed(user.id, seedId), listSeeds(user.id)])
+      .then(([seedRow, seedRows]) => {
+        if (cancelled) return;
+        setSeed(seedRow);
+        setSeeds(seedRows);
+      })
+      .catch((err) => {
+        // Deliberately does NOT set seed to null here — that means
+        // "doesn't exist / not owned" and triggers a silent redirect to
+        // /seeds. A genuine fetch failure (network, Supabase outage) is a
+        // different case, surfaced as an error with a retry instead —
+        // seed stays undefined so the render below shows loadError.
+        if (!cancelled) {
+          setLoadError(err instanceof Error ? err.message : "Couldn't load this Seed.");
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user, seedId, isDemo]);
 
   // No fallback to any other Seed — a missing id, a demo id requested by a
   // non-demo account, or a real id this user doesn't own all resolve the
@@ -117,26 +162,40 @@ export default function Seed() {
   if (!seedId || !user) {
     return <Navigate to="/seeds" replace />;
   }
+  if (wantsDemoSeed && !isDemo) {
+    return <Navigate to="/seeds" replace />;
+  }
   // Captured as its own const so TS narrows it as non-null inside the
   // nested handlers below (closures aren't narrowed by the
   // `if (!user)` guard above on their own).
   const currentUser = user;
 
-  const wantsDemoSeed = isDemoSeed(seedId);
-  const isDemo = wantsDemoSeed && isDemoAccount(user.email);
-
-  if (wantsDemoSeed && !isDemo) {
-    return <Navigate to="/seeds" replace />;
+  if (seed === undefined) {
+    if (loadError) {
+      return (
+        <div className="flex h-full flex-col items-center justify-center gap-3 bg-canvas text-center">
+          <p className="text-sm text-red-600">{loadError}</p>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="rounded-full border border-border px-4 py-2 text-xs font-medium text-ink-soft transition-colors hover:border-ink-faint hover:text-ink"
+          >
+            Try again
+          </button>
+        </div>
+      );
+    }
+    return (
+      <div className="flex h-full items-center justify-center bg-canvas">
+        <p className="text-sm text-ink-faint">Loading…</p>
+      </div>
+    );
   }
-
-  const seed = isDemo ? DEMO_SEED : getSeed(user.id, seedId);
-  if (!seed) {
+  if (seed === null) {
     return <Navigate to="/seeds" replace />;
   }
   // Same closure-narrowing reason as currentUser above.
   const currentSeed = seed;
-
-  const seeds = isDemo ? [DEMO_SEED] : listSeeds(user.id);
 
   // The raw, seedId-scoped store records — fed to the Copilot as context
   // and, for real Seeds, mapped into the display shapes below. Demo
@@ -181,8 +240,8 @@ export default function Seed() {
   async function handleTogglePublish() {
     const nextPublished = !currentSeed.isPublished;
     try {
-      await setSeedPublishedAndSync(currentUser.id, currentSeed.id, nextPublished);
-      forceRefresh((n) => n + 1);
+      const updated = await setSeedPublishedAndSync(currentUser.id, currentSeed.id, nextPublished);
+      applySeedUpdate(updated);
       showToast(nextPublished ? "Published to Grove" : "Made private");
     } catch (err) {
       showToast(
@@ -192,14 +251,46 @@ export default function Seed() {
   }
 
   async function handleSaveProjectLinks(links: { repoUrl: string; demoUrl: string }) {
-    await updateSeedLinksAndSync(currentUser.id, currentSeed.id, links);
-    forceRefresh((n) => n + 1);
+    const updated = await updateSeedLinksAndSync(currentUser.id, currentSeed.id, links);
+    applySeedUpdate(updated);
     showToast("Project links saved");
+  }
+
+  async function handleEditSeed(details: {
+    title: string;
+    description: string;
+    technologies: string[];
+  }) {
+    const updated = await updateSeedDetailsAndSync(currentUser.id, currentSeed.id, details);
+    applySeedUpdate(updated);
+    showToast("Seed updated");
+  }
+
+  function handleRequestDeleteSeed() {
+    setDeletingSeed(true);
+  }
+
+  // Left to throw on failure — ConfirmDialog's own submit handler catches
+  // it, shows the error inline, and keeps the dialog open, matching
+  // handleConfirmDeleteAchievement's same reasoning below.
+  async function handleConfirmDeleteSeed() {
+    await deleteSeedAndSync(currentUser.id, currentSeed.id);
+    navigate("/seeds", { replace: true });
   }
 
   function showToast(message: string) {
     setToast(message);
     window.setTimeout(() => setToast(null), 2500);
+  }
+
+  // Every Seed-shell mutation (publish toggle, lifecycle change, edit,
+  // link edit) ends by calling this with the row its AndSync call already
+  // returned — updates both the active `seed` and its entry in the
+  // sidebar's `seeds` list from that one response, instead of re-fetching.
+  function applySeedUpdate(updated: SeedType | null) {
+    if (!updated) return;
+    setSeed(updated);
+    setSeeds((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
   }
 
   function handleEditAchievement(achievementId: string) {
@@ -296,27 +387,27 @@ export default function Seed() {
   // are still two separate writes; this one only ever runs after at
   // least one achievement already exists.
   async function handleCompleteFromWorkflow() {
-    await completeSeedAndSync(currentUser.id, currentSeed.id);
+    const updated = await completeSeedAndSync(currentUser.id, currentSeed.id);
+    applySeedUpdate(updated);
     setCompletionWorkflowOpen(false);
-    forceRefresh((n) => n + 1);
     showToast("Project marked complete");
   }
 
   async function handleReopenProject() {
-    await reopenSeedAndSync(currentUser.id, currentSeed.id);
-    forceRefresh((n) => n + 1);
+    const updated = await reopenSeedAndSync(currentUser.id, currentSeed.id);
+    applySeedUpdate(updated);
     showToast("Project reopened");
   }
 
   async function handleArchiveProject() {
-    await archiveSeedAndSync(currentUser.id, currentSeed.id);
-    forceRefresh((n) => n + 1);
+    const updated = await archiveSeedAndSync(currentUser.id, currentSeed.id);
+    applySeedUpdate(updated);
     showToast("Project archived");
   }
 
   async function handleUnarchiveProject() {
-    await unarchiveSeedAndSync(currentUser.id, currentSeed.id);
-    forceRefresh((n) => n + 1);
+    const updated = await unarchiveSeedAndSync(currentUser.id, currentSeed.id);
+    applySeedUpdate(updated);
     showToast("Project unarchived");
   }
 
@@ -401,6 +492,8 @@ export default function Seed() {
           onUnarchiveProject={isDemo ? undefined : handleUnarchiveProject}
           onSaveLinks={isDemo ? undefined : handleSaveProjectLinks}
           onAddAchievement={isDemo ? undefined : () => setManualAchievementOpen(true)}
+          onEditSeed={isDemo ? undefined : handleEditSeed}
+          onRequestDelete={isDemo ? undefined : handleRequestDeleteSeed}
         />
 
         <div className="flex-1 overflow-y-auto">
@@ -497,6 +590,21 @@ export default function Seed() {
           destructive
           onCancel={() => setDeletingAchievement(null)}
           onConfirm={handleConfirmDeleteAchievement}
+        />
+      )}
+
+      {deletingSeed && (
+        <ConfirmDialog
+          title="Delete this Seed?"
+          description={
+            currentSeed.isPublished
+              ? `"${currentSeed.title}" and everything published with it — its Grove listing, any published achievements, and related feed activity — will be permanently removed. This can't be undone.`
+              : `"${currentSeed.title}" will be permanently removed, along with any achievements you've logged for it. This can't be undone.`
+          }
+          confirmLabel="Delete Seed"
+          destructive
+          onCancel={() => setDeletingSeed(false)}
+          onConfirm={handleConfirmDeleteSeed}
         />
       )}
 

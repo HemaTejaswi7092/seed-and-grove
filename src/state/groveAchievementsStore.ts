@@ -87,6 +87,26 @@ export async function listPublishedAchievements(
   return (data ?? []) as PublishedAchievement[];
 }
 
+// Deleting a Seed must not leave its published Achievements behind —
+// an Achievement can be published independently of its parent Seed's own
+// publish state, so this always runs on Seed deletion, not just when the
+// Seed itself was published (see state/seedPublishing.ts's
+// deleteSeedAndSync). Returns the deleted ids so the caller can also clean
+// up any feed_posts that referenced them. Not an error if there was
+// nothing to delete (an all-private Seed has none).
+export async function deletePublishedAchievementsByProject(
+  projectId: string,
+): Promise<string[]> {
+  const { data, error } = await supabase
+    .from("grove_achievements")
+    .delete()
+    .eq("project_id", projectId)
+    .select("id");
+
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as { id: string }[]).map((row) => row.id);
+}
+
 // Across every candidate, newest first — the recruiter Discover feed's
 // "Recent" tab. Same RLS as above; no per-candidate filter.
 export async function listRecentPublishedAchievements(

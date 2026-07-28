@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useAuth } from "../auth/useAuth";
-import { createSeed } from "../state/seedStore";
+import { createSeedAndSync } from "../state/seedPublishing";
 
 const stages = ["Idea", "Planning", "Building", "Scaling"] as const;
 
@@ -17,22 +17,32 @@ export default function SeedNew() {
   const [stage, setStage] = useState<(typeof stages)[number]>("Idea");
   const [technologies, setTechnologies] = useState("");
   const [description, setDescription] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    // Mock creation — Seeds aren't in the backend yet (see state/seedStore.ts).
+    if (!user || submitting) return;
+    setSubmitting(true);
+    setError(null);
     // Each submission creates its own isolated Seed record for this user,
-    // never overwriting or reusing another Seed's data.
-    if (!user) return;
-    const seed = createSeed(user.id, {
-      name,
-      goal,
-      stage,
-      technologies,
-      description,
-    });
-    await completeOnboarding();
-    navigate(`/seeds/${seed.id}`);
+    // never overwriting or reusing another Seed's data. Real Postgres row
+    // (see state/seedsStore.ts) — visible in the Seed Workspace on any
+    // device signed into this account, not just this browser.
+    try {
+      const seed = await createSeedAndSync(user.id, {
+        name,
+        goal,
+        stage,
+        technologies,
+        description,
+      });
+      await completeOnboarding();
+      navigate(`/seeds/${seed.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't create this Seed.");
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -151,13 +161,18 @@ export default function SeedNew() {
                 className={`mt-2 resize-none ${inputClasses}`}
               />
             </div>
+
+            {error && (
+              <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+            )}
           </div>
 
           <button
             type="submit"
-            className="mt-7 flex w-full items-center justify-center gap-2 rounded-full bg-accent px-6 py-3 text-sm font-medium text-white shadow-sm shadow-accent/20 transition-colors hover:bg-accent-dark"
+            disabled={submitting}
+            className="mt-7 flex w-full items-center justify-center gap-2 rounded-full bg-accent px-6 py-3 text-sm font-medium text-white shadow-sm shadow-accent/20 transition-colors hover:bg-accent-dark disabled:cursor-not-allowed disabled:opacity-60"
           >
-            🌱 Plant Seed
+            {submitting ? "Planting…" : "🌱 Plant Seed"}
           </button>
         </form>
       </motion.div>

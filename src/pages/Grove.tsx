@@ -4,7 +4,8 @@ import { useAuth } from "../auth/useAuth";
 import { isDemoAccount } from "../config/demoAccount";
 import { getDisplayName } from "../lib/displayName";
 import { getInitials } from "../lib/initials";
-import { listSeeds, getSeedAchievements } from "../state/seedStore";
+import { getSeedAchievements } from "../state/seedStore";
+import { listSeeds } from "../state/seedsStore";
 import { listPublishedAchievements } from "../state/groveAchievementsStore";
 import { listPublishedSeeds } from "../state/groveSeedsStore";
 import {
@@ -29,6 +30,7 @@ import {
   demoAchievementHighlights,
 } from "../data/mockData";
 import GroveView from "../components/grove/GroveView";
+import type { Seed } from "../types/seed";
 import type {
   AchievementHighlight,
   FeaturedSeedCard,
@@ -49,17 +51,15 @@ import type {
 // render with isOwner={false}.
 //
 // Featured Seeds and the achievement/seed join are sourced from
-// grove_seeds/grove_achievements (Postgres), not the local Seed record —
-// mirrors RecruiterCandidateProfile.tsx's read exactly, which is what
-// every other viewer of this candidate's Grove already sees. This is a
-// cross-device correctness fix: the local Seed record only ever exists in
-// the browser that created it (see state/seedStore.ts's header comment),
-// so building the owner's own Featured Seeds from it meant a second
-// device signed into the same account saw an empty Grove even after
-// publishing succeeded. `listSeeds`/`getSeedAchievements` below are used
-// only for signals that are legitimately local/draft-only (e.g. "has this
-// device drafted a Seed at all, published or not") — never for anything
-// rendered as Grove content.
+// grove_seeds/grove_achievements (Postgres), not local state — mirrors
+// RecruiterCandidateProfile.tsx's read exactly, which is what every other
+// viewer of this candidate's Grove already sees. `listSeeds` (from
+// state/seedsStore.ts) is the full Seed list (private + published),
+// itself Postgres-backed now too (see supabase/seeds.sql) — used here for
+// the Grove Strength "have you created a Seed at all" signal.
+// `getSeedAchievements` (state/seedStore.ts) is the one remaining
+// genuinely local piece — DRAFT (unpublished) Achievements have no
+// Postgres home by design, so that signal alone is still device-local.
 export default function Grove() {
   const { user, profile } = useAuth();
   const [previewMode, setPreviewMode] = useState(false);
@@ -77,6 +77,7 @@ export default function Grove() {
     PublishedAchievement[] | null
   >(null);
   const [publishedSeeds, setPublishedSeeds] = useState<PublishedSeed[] | null>(null);
+  const [allSeeds, setAllSeeds] = useState<Seed[] | null>(null);
   const [profileFields, setProfileFields] = useState<GroveProfileFields | null>(
     null,
   );
@@ -84,16 +85,22 @@ export default function Grove() {
   useEffect(() => {
     if (!user || isDemo) return;
     let cancelled = false;
-    Promise.all([listPublishedAchievements(user.id), listPublishedSeeds(user.id)])
-      .then(([achievementRows, seedRows]) => {
+    Promise.all([
+      listPublishedAchievements(user.id),
+      listPublishedSeeds(user.id),
+      listSeeds(user.id),
+    ])
+      .then(([achievementRows, publishedSeedRows, seedRows]) => {
         if (cancelled) return;
         setPublishedAchievements(achievementRows);
-        setPublishedSeeds(seedRows);
+        setPublishedSeeds(publishedSeedRows);
+        setAllSeeds(seedRows);
       })
       .catch(() => {
         if (cancelled) return;
         setPublishedAchievements([]);
         setPublishedSeeds([]);
+        setAllSeeds([]);
       });
     return () => {
       cancelled = true;
@@ -186,7 +193,12 @@ export default function Grove() {
     );
   }
 
-  if (publishedAchievements === null || publishedSeeds === null || profileFields === null) {
+  if (
+    publishedAchievements === null ||
+    publishedSeeds === null ||
+    allSeeds === null ||
+    profileFields === null
+  ) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <span className="flex h-10 w-10 animate-pulse items-center justify-center rounded-xl bg-accent-soft text-accent">
@@ -196,10 +208,6 @@ export default function Grove() {
     );
   }
 
-  // Local-only — used below strictly for draft-state signals (e.g. "has
-  // this device drafted a Seed at all"), never for anything rendered as
-  // Grove content. See this file's header comment.
-  const allSeeds = listSeeds(currentUser.id);
   const seedById = new Map(publishedSeeds.map((seed) => [seed.id, seed]));
 
   // An achievement can be published without its parent Seed being

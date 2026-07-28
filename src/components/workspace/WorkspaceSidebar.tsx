@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { Sprout, Bot, History, Sparkles, Settings, Flame } from "lucide-react";
+import { Sprout, Bot, History, Sparkles, Settings, Flame, Globe } from "lucide-react";
 import type { WorkspaceTab } from "./tabs";
 import type { Seed } from "../../types/seed";
 
@@ -56,13 +56,24 @@ export default function WorkspaceSidebar({
                 ].join(" ")}
               >
                 <span className="flex items-center justify-between gap-2">
-                  <span
-                    className={[
-                      "truncate text-sm font-medium",
-                      isActive ? "text-white" : "text-white/70",
-                    ].join(" ")}
-                  >
-                    {seed.title}
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <span
+                      className={[
+                        "truncate text-sm font-medium",
+                        isActive ? "text-white" : "text-white/70",
+                      ].join(" ")}
+                    >
+                      {seed.title}
+                    </span>
+                    {seed.isPublished && (
+                      <Globe
+                        className="h-3 w-3 shrink-0 text-emerald-400"
+                        strokeWidth={2.25}
+                        aria-label="Published"
+                      >
+                        <title>Published to Grove</title>
+                      </Globe>
+                    )}
                   </span>
                   {seed.lifecycleStatus === "completed" ? (
                     <span className="shrink-0 rounded-full bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-medium text-emerald-400">
