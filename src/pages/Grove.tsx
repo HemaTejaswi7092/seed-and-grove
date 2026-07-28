@@ -4,8 +4,9 @@ import { useAuth } from "../auth/useAuth";
 import { isDemoAccount } from "../config/demoAccount";
 import { getDisplayName } from "../lib/displayName";
 import { getInitials } from "../lib/initials";
-import { listSeeds, getPublishedSeeds, getSeedAchievements } from "../state/seedStore";
+import { listSeeds, getSeedAchievements } from "../state/seedStore";
 import { listPublishedAchievements } from "../state/groveAchievementsStore";
+import { listPublishedSeeds } from "../state/groveSeedsStore";
 import {
   getCandidateProfile,
   saveCandidateProfile,
@@ -33,6 +34,7 @@ import type {
   FeaturedSeedCard,
   GroveProfileFields,
   PublishedAchievement,
+  PublishedSeed,
 } from "../types/grove";
 
 // Thin data-loading wrapper: this file's only job is deciding *what data*
@@ -45,6 +47,19 @@ import type {
 // unchanged — it would just need a loader that resolves a Seed/
 // achievement set by username instead of by the current session, and
 // render with isOwner={false}.
+//
+// Featured Seeds and the achievement/seed join are sourced from
+// grove_seeds/grove_achievements (Postgres), not the local Seed record —
+// mirrors RecruiterCandidateProfile.tsx's read exactly, which is what
+// every other viewer of this candidate's Grove already sees. This is a
+// cross-device correctness fix: the local Seed record only ever exists in
+// the browser that created it (see state/seedStore.ts's header comment),
+// so building the owner's own Featured Seeds from it meant a second
+// device signed into the same account saw an empty Grove even after
+// publishing succeeded. `listSeeds`/`getSeedAchievements` below are used
+// only for signals that are legitimately local/draft-only (e.g. "has this
+// device drafted a Seed at all, published or not") — never for anything
+// rendered as Grove content.
 export default function Grove() {
   const { user, profile } = useAuth();
   const [previewMode, setPreviewMode] = useState(false);
@@ -52,15 +67,16 @@ export default function Grove() {
 
   const isDemo = !!user && isDemoAccount(user.email);
 
-  // Both Published Achievements and the candidate's own profile fields
-  // now live in Postgres (grove_achievements / candidate_profiles — see
-  // supabase/candidate_profiles.sql), not localStorage. Fetched fresh on
-  // every visit; routed through .then()/.catch() so no setState call is
-  // ever reached synchronously in the effect body itself (same pattern
-  // as useRecruiterProfile.ts).
+  // Published Seeds/Achievements and the candidate's own profile fields
+  // all live in Postgres (grove_seeds / grove_achievements /
+  // candidate_profiles), not localStorage. Fetched fresh on every visit;
+  // routed through .then()/.catch() so no setState call is ever reached
+  // synchronously in the effect body itself (same pattern as
+  // useRecruiterProfile.ts).
   const [publishedAchievements, setPublishedAchievements] = useState<
     PublishedAchievement[] | null
   >(null);
+  const [publishedSeeds, setPublishedSeeds] = useState<PublishedSeed[] | null>(null);
   const [profileFields, setProfileFields] = useState<GroveProfileFields | null>(
     null,
   );
@@ -68,12 +84,16 @@ export default function Grove() {
   useEffect(() => {
     if (!user || isDemo) return;
     let cancelled = false;
-    listPublishedAchievements(user.id)
-      .then((rows) => {
-        if (!cancelled) setPublishedAchievements(rows);
+    Promise.all([listPublishedAchievements(user.id), listPublishedSeeds(user.id)])
+      .then(([achievementRows, seedRows]) => {
+        if (cancelled) return;
+        setPublishedAchievements(achievementRows);
+        setPublishedSeeds(seedRows);
       })
       .catch(() => {
-        if (!cancelled) setPublishedAchievements([]);
+        if (cancelled) return;
+        setPublishedAchievements([]);
+        setPublishedSeeds([]);
       });
     return () => {
       cancelled = true;
@@ -166,7 +186,7 @@ export default function Grove() {
     );
   }
 
-  if (publishedAchievements === null || profileFields === null) {
+  if (publishedAchievements === null || publishedSeeds === null || profileFields === null) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <span className="flex h-10 w-10 animate-pulse items-center justify-center rounded-xl bg-accent-soft text-accent">
@@ -176,37 +196,49 @@ export default function Grove() {
     );
   }
 
+  // Local-only — used below strictly for draft-state signals (e.g. "has
+  // this device drafted a Seed at all"), never for anything rendered as
+  // Grove content. See this file's header comment.
   const allSeeds = listSeeds(currentUser.id);
-  const publishedSeeds = getPublishedSeeds(currentUser.id);
-  const seedById = new Map(allSeeds.map((seed) => [seed.id, seed]));
+  const seedById = new Map(publishedSeeds.map((seed) => [seed.id, seed]));
 
-  const achievementsWithSeed: PublishedAchievementWithSeed[] = publishedAchievements
-    .map((achievement) => {
+  // An achievement can be published without its parent Seed being
+  // published (there's no dependency between the two) — when that
+  // happens there's no grove_seeds row to join against, so this falls
+  // back to the achievement's own project_domain rather than dropping
+  // the achievement (same fallback RecruiterCandidateProfile.tsx uses).
+  const achievementsWithSeed: PublishedAchievementWithSeed[] = publishedAchievements.map(
+    (achievement) => {
       const seed = seedById.get(achievement.project_id);
-      return seed ? { achievement, seed: { id: seed.id, title: seed.title } } : null;
-    })
-    .filter((item): item is PublishedAchievementWithSeed => item !== null);
+      return {
+        achievement,
+        seed: seed
+          ? { id: seed.id, title: seed.title }
+          : { id: achievement.project_id, title: achievement.project_domain || "Project" },
+      };
+    },
+  );
 
-  const featuredSeeds: FeaturedSeedCard[] = publishedSeeds.map((seed) => {
-    const seedAchievements = achievementsWithSeed.filter(
-      (item) => item.seed.id === seed.id,
-    );
-    return {
-      id: seed.id,
-      title: seed.title,
-      description: seed.description,
-      status: seed.status,
-      progress: seed.progress,
-      lifecycleStatus: seed.lifecycleStatus,
-      technologies: seed.technologies,
-      relatedAchievements: seedAchievements.map((item) => ({
-        id: item.achievement.id,
-        title: item.achievement.title,
-      })),
-      repoUrl: seed.repoUrl || null,
-      demoUrl: seed.demoUrl || null,
-    };
-  });
+  const featuredSeeds: FeaturedSeedCard[] = publishedSeeds.map((seed) => ({
+    id: seed.id,
+    title: seed.title,
+    description: seed.description,
+    status: seed.status,
+    // grove_seeds deliberately doesn't mirror the private progress field
+    // — see types/grove.ts's FeaturedSeedCard comment. Previously this
+    // read the local Seed's live progress %; that's no longer available
+    // once Featured Seeds is sourced from Postgres (the fix for this
+    // file's cross-device bug), so it's null here same as every other
+    // (non-owner) viewer of this Grove already sees.
+    progress: null,
+    lifecycleStatus: seed.lifecycle_status,
+    technologies: seed.technologies,
+    relatedAchievements: publishedAchievements
+      .filter((achievement) => achievement.project_id === seed.id)
+      .map((achievement) => ({ id: achievement.id, title: achievement.title })),
+    repoUrl: seed.repo_url,
+    demoUrl: seed.demo_url,
+  }));
 
   const skills = deriveSkillsFromAchievements(achievementsWithSeed);
 
@@ -238,20 +270,30 @@ export default function Grove() {
     profileFields.headline.trim() || profileFields.professionalSummary.trim(),
   );
   const hasAboutSection = Boolean(profileFields.areasOfInterest.trim());
-  const hasAchievementCaptured = allSeeds.some(
-    (seed) => getSeedAchievements(currentUser.id, seed.id).length > 0,
-  );
+  // Local drafted-and-captured OR anything actually published — either is
+  // real evidence of having captured an achievement, and only checking
+  // the local (draft-only) side would wrongly read as "none" on a device
+  // that never drafted anything but does have published Postgres content.
+  const hasAchievementCaptured =
+    allSeeds.some((seed) => getSeedAchievements(currentUser.id, seed.id).length > 0) ||
+    achievementsWithSeed.length > 0;
 
   const strength = calculateGroveStrength({
     hasHeadlineOrBio,
-    hasFirstSeed: allSeeds.length > 0,
+    hasFirstSeed: allSeeds.length > 0 || publishedSeeds.length > 0,
     hasAchievementCaptured,
     hasFirstPublishedSeed: publishedSeeds.length > 0,
     hasPublishedAchievement: achievementsWithSeed.length > 0,
     hasAboutSection,
   });
 
-  const isFreshGrove = allSeeds.length === 0 && !hasHeadlineOrBio;
+  // Same reasoning as hasAchievementCaptured above — a device with no
+  // local drafts but real published content is not a fresh Grove.
+  const isFreshGrove =
+    allSeeds.length === 0 &&
+    publishedSeeds.length === 0 &&
+    achievementsWithSeed.length === 0 &&
+    !hasHeadlineOrBio;
 
   return (
     <GroveView
