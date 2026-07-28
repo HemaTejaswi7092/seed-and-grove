@@ -4,6 +4,7 @@ import ProtectedRoute from "./auth/ProtectedRoute";
 import AuthenticatedLayout from "./layout/AuthenticatedLayout";
 import RecruiterLayout from "./layout/RecruiterLayout";
 import Home from "./pages/Home";
+import ProductOverview from "./pages/ProductOverview";
 import SignUp from "./pages/SignUp";
 import SignIn from "./pages/SignIn";
 import AuthCallback from "./pages/AuthCallback";
@@ -34,6 +35,10 @@ function App() {
     <AuthProvider>
       <Routes>
         <Route path="/" element={<Home />} />
+        {/* Standalone, print-ready one-pager — no shared layout/nav on
+            purpose (see ProductOverview.tsx's top comment), so it can be
+            exported as a clean PDF via the browser's Print dialog. */}
+        <Route path="/product-overview" element={<ProductOverview />} />
         <Route path="/signup" element={<SignUp />} />
         <Route path="/signin" element={<SignIn accountType="candidate" />} />
         {/* Same SignIn component/logic as /signin — accountType only

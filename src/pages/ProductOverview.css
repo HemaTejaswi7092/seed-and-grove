@@ -1,0 +1,44 @@
+/* Print-only page geometry for /product-overview. Scoped to this route via
+   a dedicated stylesheet (not index.css) so it can never affect any other
+   page's layout or print behavior. Tailwind's `print:` variant handles
+   show/hide; only the physical page size/margins need a real @page rule,
+   since that's not expressible as a utility class. */
+
+@page {
+  size: 8.5in 11in;
+  margin: 0;
+}
+
+.po-sheet {
+  width: 8.5in;
+  min-height: 11in;
+}
+
+@media print {
+  html,
+  body {
+    background: #ffffff;
+  }
+
+  /* Without this, Chrome's print engine drops background colors and box
+     shadows by default ("economy mode") regardless of the page's own
+     styles, which would silently strip every accent-soft highlight box
+     and table row shade from the PDF. Forces exact color output instead
+     of depending on the user separately enabling "Background graphics"
+     in the print dialog. */
+  * {
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+
+  .po-sheet {
+    width: 8.5in !important;
+    height: 11in !important;
+    min-height: 0 !important;
+    /* Safety net, not the primary fit strategy: content is sized to fit
+       within 11in on its own. If a font substitution or OS print-scaling
+       quirk pushes it a few px over, this clips instead of silently
+       spilling a near-blank second page. */
+    overflow: hidden !important;
+  }
+}
