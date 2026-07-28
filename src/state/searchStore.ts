@@ -185,6 +185,52 @@ export async function searchPeople(
     .map(({ result }) => result);
 }
 
+// "Suggested people" for the feed sidebar — the same public surfaces
+// searchPeople already reads, just without a search term: the most
+// recently updated candidates and recruiters, excluding the viewer
+// themselves. Deliberately independent of Grove/achievement data (a user
+// with zero published Seeds is still a valid suggestion) — see
+// FeedSuggestionsPanel.tsx's header comment for why this exists.
+const SUGGESTIONS_LIMIT = 5;
+
+export async function suggestPeople(
+  currentUserId: string,
+  limit = SUGGESTIONS_LIMIT,
+): Promise<PersonSearchResult[]> {
+  const [candidatesRes, recruitersRes] = await Promise.all([
+    supabase
+      .from("candidate_profiles_public")
+      .select(CANDIDATE_COLUMNS)
+      .neq("user_id", currentUserId)
+      .order("updated_at", { ascending: false })
+      .limit(limit),
+    supabase
+      .from("recruiter_profiles_public")
+      .select(RECRUITER_COLUMNS)
+      .neq("user_id", currentUserId)
+      .limit(limit),
+  ]);
+
+  if (candidatesRes.error) throw new Error(candidatesRes.error.message);
+  if (recruitersRes.error) throw new Error(recruitersRes.error.message);
+
+  const candidates = ((candidatesRes.data ?? []) as CandidateProfilePublic[]).map(
+    toCandidateResult,
+  );
+  const recruiters = ((recruitersRes.data ?? []) as RecruiterProfilePublic[]).map(
+    toRecruiterResult,
+  );
+
+  // Interleave so neither group can monopolize the short sidebar list.
+  const merged: PersonSearchResult[] = [];
+  const maxLen = Math.max(candidates.length, recruiters.length);
+  for (let i = 0; i < maxLen; i++) {
+    if (candidates[i]) merged.push(candidates[i]);
+    if (recruiters[i]) merged.push(recruiters[i]);
+  }
+  return merged.slice(0, limit);
+}
+
 export async function searchJobs(
   query: string,
   limit = DISPLAY_LIMIT,

@@ -304,6 +304,8 @@ export default function Dashboard() {
         <div className="lg:sticky lg:top-24">
           <FeedSuggestionsPanel
             isDemo={isDemo}
+            currentUserId={user.id}
+            viewerAccountType="candidate"
             featuredProject={isDemo ? demoFeaturedSeeds[0] : undefined}
             trendingSkills={isDemo ? demoSkillSummaries : undefined}
           />
