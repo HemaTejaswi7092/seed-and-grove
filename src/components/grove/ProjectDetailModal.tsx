@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Award, Code2, ExternalLink, Trophy, X } from "lucide-react";
 import { getInitials } from "../../lib/initials";
 import { shouldShowStatusLabel } from "../../lib/seedStatus";
+import { normalizeSkillKey } from "../../lib/groveSkills";
 import AchievementCard from "./AchievementCard";
 import type { AchievementHighlight, FeaturedSeedCard } from "../../types/grove";
 
@@ -32,6 +33,12 @@ export default function ProjectDetailModal({
   selectedSkill,
   onClose,
 }: ProjectDetailModalProps) {
+  // See FeaturedSeeds.tsx's identical normalizedSelectedSkill comment —
+  // selectedSkill is the canonical, case-normalized label; an
+  // achievement's own skillsDemonstrated keeps whatever casing was
+  // originally typed, so both sides need normalizing to match.
+  const normalizedSelectedSkill = selectedSkill ? normalizeSkillKey(selectedSkill) : null;
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -159,8 +166,10 @@ export default function ProjectDetailModal({
                     key={achievement.id}
                     achievement={achievement}
                     isHighlighted={
-                      selectedSkill !== null &&
-                      achievement.skillsDemonstrated.includes(selectedSkill)
+                      normalizedSelectedSkill !== null &&
+                      achievement.skillsDemonstrated.some(
+                        (skill) => normalizeSkillKey(skill) === normalizedSelectedSkill,
+                      )
                     }
                   />
                 ))}

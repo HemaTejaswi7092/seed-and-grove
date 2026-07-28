@@ -9,6 +9,43 @@ export interface PublishedAchievementWithSeed {
   seed: { id: string; title: string };
 }
 
+// Skills are free text typed per-achievement (an achievement's "Skills
+// demonstrated" field) — nothing constrains casing, so "React", "react",
+// and "REACT" are all the same skill and must never appear as separate
+// badges. This is the single normalized identity used everywhere a skill
+// needs to be matched against another skill: aggregation below,
+// cross-highlighting a Featured Seed against the selected skill
+// (FeaturedSeeds.tsx/ProjectDetailModal.tsx), and any future filtering.
+// Never used for display — canonical casing is resolved separately in
+// deriveSkillsFromAchievements below.
+export function normalizeSkillKey(skill: string): string {
+  return skill.trim().toLowerCase();
+}
+
+interface SkillAccumulator {
+  // How many times each exact-cased spelling occurred, so the most
+  // common casing can be used as the one label shown everywhere in the
+  // UI ("React" wins over a single stray "react"). Ties — including the
+  // common case of every mention sharing one casing — resolve to
+  // whichever casing was seen first, since Map iteration preserves
+  // insertion order.
+  labelCounts: Map<string, number>;
+  achievementCount: number;
+  supportingAchievements: SkillSummary["supportingAchievements"];
+}
+
+function canonicalLabel(labelCounts: Map<string, number>): string {
+  let best = "";
+  let bestCount = -1;
+  for (const [label, count] of labelCounts) {
+    if (count > bestCount) {
+      bestCount = count;
+      best = label;
+    }
+  }
+  return best;
+}
+
 // Skills come only from published achievements' own skills_demonstrated
 // field — never from profile text or user-entered keywords (per Grove
 // spec). Each skill carries the achievement(s) that back it, so the UI
@@ -19,12 +56,13 @@ export interface PublishedAchievementWithSeed {
 export function deriveSkillsFromAchievements(
   items: PublishedAchievementWithSeed[],
 ): SkillSummary[] {
-  const bySkill = new Map<string, SkillSummary>();
+  const bySkill = new Map<string, SkillAccumulator>();
 
   for (const { achievement, seed } of items) {
     for (const rawSkill of achievement.skills_demonstrated) {
-      const skill = rawSkill.trim();
-      if (!skill) continue;
+      const trimmed = rawSkill.trim();
+      if (!trimmed) continue;
+      const key = normalizeSkillKey(trimmed);
 
       const supporting = {
         id: achievement.id,
@@ -37,79 +75,84 @@ export function deriveSkillsFromAchievements(
         proofLabel: achievement.proof_label,
       };
 
-      const existing = bySkill.get(skill);
-      if (existing) {
-        existing.achievementCount += 1;
-        existing.supportingAchievements.push(supporting);
-      } else {
-        bySkill.set(skill, {
-          skill,
-          achievementCount: 1,
-          // Recomputed below once every achievement for this skill has
-          // been collected — cheaper than de-duping on every push.
-          projectCount: 0,
-          technologies: [],
-          supportingAchievements: [supporting],
-        });
+      let acc = bySkill.get(key);
+      if (!acc) {
+        acc = { labelCounts: new Map(), achievementCount: 0, supportingAchievements: [] };
+        bySkill.set(key, acc);
       }
+      acc.achievementCount += 1;
+      acc.supportingAchievements.push(supporting);
+      acc.labelCounts.set(trimmed, (acc.labelCounts.get(trimmed) ?? 0) + 1);
     }
   }
 
-  for (const summary of bySkill.values()) {
-    // COUNT(DISTINCT project_id) — a project with 5 achievements all
-    // demonstrating "Python" still only counts once here. This is the
-    // number Grove treats as a skill's evidence strength (sort order,
-    // tier, "Verified by" line) — achievementCount is kept only for the
-    // drawer's own achievement listing, never for ranking or display.
-    summary.projectCount = new Set(
-      summary.supportingAchievements.map((item) => item.seedId),
-    ).size;
-    summary.technologies = Array.from(
-      new Set(summary.supportingAchievements.flatMap((item) => item.technologiesUsed)),
-    );
+  const summaries: SkillSummary[] = [];
+  for (const acc of bySkill.values()) {
+    summaries.push({
+      skill: canonicalLabel(acc.labelCounts),
+      achievementCount: acc.achievementCount,
+      // COUNT(DISTINCT project_id) — a project with 5 achievements all
+      // demonstrating "Python" still only counts once here. This is the
+      // number Grove treats as a skill's evidence strength (sort order,
+      // bar count) — achievementCount is kept only for the drawer's own
+      // achievement listing, never for ranking or display.
+      projectCount: new Set(acc.supportingAchievements.map((item) => item.seedId)).size,
+      technologies: Array.from(
+        new Set(acc.supportingAchievements.flatMap((item) => item.technologiesUsed)),
+      ),
+      supportingAchievements: acc.supportingAchievements,
+    });
   }
 
-  return Array.from(bySkill.values()).sort(
-    (a, b) =>
-      b.projectCount - a.projectCount ||
-      b.achievementCount - a.achievementCount ||
-      a.skill.localeCompare(b.skill),
+  // Project count is the sole ranking signal — depth of demonstrated
+  // experience, not raw achievement volume. Ties (identical project
+  // count) fall back to alphabetical order only.
+  return summaries.sort(
+    (a, b) => b.projectCount - a.projectCount || a.skill.localeCompare(b.skill),
   );
 }
 
-// 3 = Core (broadest evidence relative to this candidate's other
-// skills), 1 = Emerging. Always relative, never an absolute cutoff like
-// "projectCount >= 5" — a candidate with one strong Seed and a candidate
-// with twenty should each still see a meaningful core/supporting split
-// among their own skills. When every skill spans the same number of
-// projects (maxCount <= 1, e.g. a brand-new Grove, or every skill so far
-// traces back to a single project), there's nothing meaningful to rank
-// against yet, so everything is treated as Core rather than arbitrarily
-// demoting skills that just haven't spread to a second project yet.
-//
-// Driven by projectCount, not achievementCount — a skill demonstrated
-// across many projects is stronger evidence than the same skill
-// demonstrated many times on one project.
-export type SkillEvidenceTier = 1 | 2 | 3;
+const MAX_EVIDENCE_BARS = 5;
 
-export interface SkillWithTier extends SkillSummary {
-  tier: SkillEvidenceTier;
+export interface SkillWithEvidence extends SkillSummary {
+  // Whether this skill gets the prominent hero row vs. a categorized
+  // supporting row — broadest evidence relative to this candidate's own
+  // other skills. Always relative, never an absolute cutoff like
+  // "projectCount >= 5": a candidate with one strong Seed and a candidate
+  // with twenty should each still see a meaningful core/supporting split
+  // among their own skills. When every skill spans the same number of
+  // projects (maxCount <= 1, e.g. a brand-new Grove, or every skill so
+  // far traces back to a single project), there's nothing meaningful to
+  // rank against yet, so everything is treated as core rather than
+  // arbitrarily demoting skills that just haven't spread to a second
+  // project yet.
+  isCore: boolean;
+  // How many of MAX_EVIDENCE_BARS bars to fill — always computed
+  // directly from this skill's projectCount relative to the strongest
+  // skill in the same set, never a fixed/quantized level. A skill backed
+  // by half as many distinct projects as the candidate's strongest skill
+  // gets roughly half as many bars, not an identical indicator to every
+  // other skill. Floors at 1 (never 0) since anything rendered here is
+  // backed by at least one published project.
+  barCount: number;
 }
 
-function evidenceTier(count: number, maxCount: number): SkillEvidenceTier {
-  if (maxCount <= 1) return 3;
-  const ratio = count / maxCount;
-  if (ratio >= 0.66) return 3;
-  if (ratio >= 0.34) return 2;
-  return 1;
+function evidenceBarCount(projectCount: number, maxProjectCount: number): number {
+  if (maxProjectCount <= 0) return 0;
+  const ratio = projectCount / maxProjectCount;
+  return Math.max(1, Math.min(MAX_EVIDENCE_BARS, Math.round(ratio * MAX_EVIDENCE_BARS)));
 }
 
 // Input must already be sorted by projectCount desc (see
 // deriveSkillsFromAchievements) — this preserves that order, it never
 // re-sorts.
-export function tierSkills(skills: SkillSummary[]): SkillWithTier[] {
+export function withEvidenceStrength(skills: SkillSummary[]): SkillWithEvidence[] {
   const maxCount = skills.reduce((max, item) => Math.max(max, item.projectCount), 0);
-  return skills.map((skill) => ({ ...skill, tier: evidenceTier(skill.projectCount, maxCount) }));
+  return skills.map((skill) => ({
+    ...skill,
+    isCore: maxCount <= 1 ? true : skill.projectCount / maxCount >= 0.66,
+    barCount: evidenceBarCount(skill.projectCount, maxCount),
+  }));
 }
 
 // Best-effort grouping for the Verified Skills section's category rows —

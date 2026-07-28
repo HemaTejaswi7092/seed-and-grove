@@ -1,10 +1,10 @@
 import { motion } from "framer-motion";
 import { Award, Layers, Link2, ShieldCheck, X } from "lucide-react";
 import SkillEvidenceBars from "./SkillEvidenceBars";
-import type { SkillWithTier } from "../../lib/groveSkills";
+import type { SkillWithEvidence } from "../../lib/groveSkills";
 
 interface SkillDrawerProps {
-  skill: SkillWithTier;
+  skill: SkillWithEvidence;
   onClose: () => void;
 }
 
@@ -73,7 +73,7 @@ export default function SkillDrawer({ skill, onClose }: SkillDrawerProps) {
             </p>
           </div>
           <span className="text-accent">
-            <SkillEvidenceBars tier={skill.tier} size="md" />
+            <SkillEvidenceBars barCount={skill.barCount} size="md" />
           </span>
         </div>
 

@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { Sprout, ArrowUpRight, Sparkles } from "lucide-react";
 import { getInitials } from "../../lib/initials";
 import { shouldShowStatusLabel } from "../../lib/seedStatus";
+import { normalizeSkillKey } from "../../lib/groveSkills";
 import ProjectDetailModal from "./ProjectDetailModal";
 import type { AchievementHighlight, FeaturedSeedCard } from "../../types/grove";
 
@@ -39,6 +40,14 @@ export default function FeaturedSeeds({
 }: FeaturedSeedsProps) {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const selectedProject = seeds.find((seed) => seed.id === selectedProjectId) ?? null;
+  // selectedSkill is always the canonical, case-normalized label a skill
+  // resolved to in VerifiedSkills (see groveSkills.ts's
+  // deriveSkillsFromAchievements) — but each achievement's own
+  // skillsDemonstrated array still holds whatever casing the candidate
+  // originally typed ("react" vs "React"). Comparing normalized keys on
+  // both sides is what keeps this highlight matching case-insensitively
+  // instead of silently missing achievements with different casing.
+  const normalizedSelectedSkill = selectedSkill ? normalizeSkillKey(selectedSkill) : null;
 
   if (seeds.length === 0 && !isOwner) return null;
 
@@ -70,11 +79,13 @@ export default function FeaturedSeeds({
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           {seeds.map((seed, index) => {
             const isMatch =
-              selectedSkill !== null &&
+              normalizedSelectedSkill !== null &&
               achievementHighlights.some(
                 (achievement) =>
                   achievement.seedId === seed.id &&
-                  achievement.skillsDemonstrated.includes(selectedSkill),
+                  achievement.skillsDemonstrated.some(
+                    (skill) => normalizeSkillKey(skill) === normalizedSelectedSkill,
+                  ),
               );
             const isDimmed = selectedSkill !== null && !isMatch;
 

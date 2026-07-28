@@ -98,17 +98,25 @@ export default function Seeds() {
                 <p className="mt-0.5 text-xs text-ink-faint">
                   {seed.description}
                 </p>
-                <div className="mt-4 flex items-center gap-2">
-                  <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-border">
-                    <div
-                      className="h-full rounded-full bg-accent"
-                      style={{ width: `${seed.progress}%` }}
-                    />
+                {/* Progress is only meaningful while a Seed is actively
+                    being built — a Completed or Archived project has
+                    nothing left to track toward, so showing a stale/blank
+                    percentage there just reads as a bug (e.g. "Completed"
+                    next to "0%"). Same in_progress gate already used for
+                    the free-text status label above (lib/seedStatus.ts). */}
+                {shouldShowStatusLabel(seed.lifecycleStatus) && (
+                  <div className="mt-4 flex items-center gap-2">
+                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-border">
+                      <div
+                        className="h-full rounded-full bg-accent"
+                        style={{ width: `${seed.progress}%` }}
+                      />
+                    </div>
+                    <span className="text-xs font-medium text-ink-soft">
+                      {seed.progress}%
+                    </span>
                   </div>
-                  <span className="text-xs font-medium text-ink-soft">
-                    {seed.progress}%
-                  </span>
-                </div>
+                )}
                 <p className="mt-3 text-[11px] font-medium text-ink-faint">
                   Source: {sourceLabel[seed.sourceType]}
                 </p>

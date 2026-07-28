@@ -2,8 +2,8 @@ import { motion } from "framer-motion";
 import { Sparkles } from "lucide-react";
 import SkillDrawer from "./SkillDrawer";
 import SkillEvidenceBars from "./SkillEvidenceBars";
-import { categorizeSkill, SKILL_CATEGORY_ORDER, tierSkills } from "../../lib/groveSkills";
-import type { SkillWithTier } from "../../lib/groveSkills";
+import { categorizeSkill, SKILL_CATEGORY_ORDER, withEvidenceStrength } from "../../lib/groveSkills";
+import type { SkillWithEvidence } from "../../lib/groveSkills";
 import type { SkillSummary } from "../../types/grove";
 
 interface VerifiedSkillsProps {
@@ -21,27 +21,46 @@ interface VerifiedSkillsProps {
 // to this candidate's own other skills) get a prominent hero row; the
 // rest are grouped into scannable categories below, so a recruiter can
 // take in a candidate's whole skill surface in seconds, then click into
-// any one skill for its full project-by-project evidence trail.
+// any one skill for its full project-by-project evidence trail. Evidence
+// strength is communicated purely by bar length and position — no "N
+// Projects" label on the card itself, so the ranking reads at a glance
+// without requiring anyone to read text (exact counts are still visible
+// in the SkillDrawer opened by clicking a skill).
 export default function VerifiedSkills({
   skills,
   selectedSkill,
   onSelectSkill,
 }: VerifiedSkillsProps) {
-  const tiered = tierSkills(skills);
-  const activeSkill = tiered.find((item) => item.skill === selectedSkill) ?? null;
-  const core = tiered.filter((item) => item.tier === 3);
-  const supporting = tiered.filter((item) => item.tier !== 3);
+  const ranked = withEvidenceStrength(skills);
+  const activeSkill = ranked.find((item) => item.skill === selectedSkill) ?? null;
+  const core = ranked.filter((item) => item.isCore);
+  const supporting = ranked.filter((item) => !item.isCore);
 
-  const supportingByCategory = new Map<string, SkillWithTier[]>();
+  const supportingByCategory = new Map<string, SkillWithEvidence[]>();
   for (const skill of supporting) {
     const category = categorizeSkill(skill.skill);
     const list = supportingByCategory.get(category);
     if (list) list.push(skill);
     else supportingByCategory.set(category, [skill]);
   }
+  // Categories themselves are ordered by their own strongest skill (each
+  // category's list is already projectCount desc — see
+  // deriveSkillsFromAchievements — so index 0 is that category's best
+  // evidence), not by a fixed topic order. This keeps the whole
+  // Supporting Skills layout strongest-evidence-first end to end, not
+  // just within each category row. SKILL_CATEGORY_ORDER only breaks ties
+  // between categories whose top skill spans the same project count, so
+  // the grouping stays stable rather than reshuffling on every render.
   const categoryRows = SKILL_CATEGORY_ORDER.filter((category) =>
     supportingByCategory.has(category),
-  );
+  ).sort((a, b) => {
+    const topA = supportingByCategory.get(a)![0];
+    const topB = supportingByCategory.get(b)![0];
+    return (
+      topB.projectCount - topA.projectCount ||
+      SKILL_CATEGORY_ORDER.indexOf(a) - SKILL_CATEGORY_ORDER.indexOf(b)
+    );
+  });
 
   function handleSelect(skill: string) {
     onSelectSkill(selectedSkill === skill ? null : skill);
@@ -118,7 +137,7 @@ function SkillPill({
   isActive,
   onSelect,
 }: {
-  skill: SkillWithTier;
+  skill: SkillWithEvidence;
   variant: "core" | "supporting";
   index: number;
   isActive: boolean;
@@ -158,22 +177,19 @@ function SkillPill({
         )}
         {skill.skill}
         <span className={isActive ? "text-white" : isCore ? "text-accent" : "text-ink-faint"}>
-          <SkillEvidenceBars tier={skill.tier} size={isCore ? "md" : "sm"} />
+          <SkillEvidenceBars barCount={skill.barCount} size={isCore ? "md" : "sm"} />
         </span>
       </motion.button>
 
-      <div
-        role="tooltip"
-        className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 w-56 -translate-x-1/2 translate-y-1 rounded-xl bg-ink px-3.5 py-3 text-white opacity-0 shadow-xl transition-all duration-200 group-hover:translate-y-0 group-hover:opacity-100"
-      >
-        <p className="text-xs font-semibold">
-          {skill.projectCount} {skill.projectCount === 1 ? "Project" : "Projects"}
-        </p>
-        {summary && (
-          <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-white/70">{summary}</p>
-        )}
-        <div className="absolute top-full left-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1 rotate-45 bg-ink" />
-      </div>
+      {summary && (
+        <div
+          role="tooltip"
+          className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 w-56 -translate-x-1/2 translate-y-1 rounded-xl bg-ink px-3.5 py-3 text-white opacity-0 shadow-xl transition-all duration-200 group-hover:translate-y-0 group-hover:opacity-100"
+        >
+          <p className="line-clamp-2 text-[11px] leading-snug text-white/85">{summary}</p>
+          <div className="absolute top-full left-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1 rotate-45 bg-ink" />
+        </div>
+      )}
     </div>
   );
 }
