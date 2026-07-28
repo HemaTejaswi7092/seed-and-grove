@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, X, MapPin, ArrowUpRight } from "lucide-react";
-import { searchCandidates, searchJobs } from "../../state/searchStore";
-import type { CandidateSearchResult, JobSearchResult } from "../../state/searchStore";
+import { searchPeople, searchJobs } from "../../state/searchStore";
+import type { PersonSearchResult, JobSearchResult } from "../../state/searchStore";
 import { useMenuDismissRef } from "../../lib/useMenuDismiss";
 import { getInitials } from "../../lib/initials";
 import type { EmploymentType, WorkMode } from "../../recruiter/types";
@@ -37,7 +37,7 @@ export default function GlobalSearchBar() {
   const [open, setOpen] = useState(false);
   const [status, setStatus] = useState<SearchStatus>("idle");
   const [error, setError] = useState<string | null>(null);
-  const [people, setPeople] = useState<CandidateSearchResult[]>([]);
+  const [people, setPeople] = useState<PersonSearchResult[]>([]);
   const [jobs, setJobs] = useState<JobSearchResult[]>([]);
 
   const containerRef = useMenuDismissRef<HTMLDivElement>(open, () => setOpen(false));
@@ -71,7 +71,7 @@ export default function GlobalSearchBar() {
       }
     });
 
-    Promise.all([searchCandidates(debouncedQuery), searchJobs(debouncedQuery)])
+    Promise.all([searchPeople(debouncedQuery), searchJobs(debouncedQuery)])
       .then(([peopleResults, jobResults]) => {
         if (cancelled) return;
         setPeople(peopleResults);
@@ -98,9 +98,18 @@ export default function GlobalSearchBar() {
     setOpen(false);
   }
 
-  function goToCandidate(candidateId: string) {
+  // This component only ever renders on the candidate Dashboard, so both
+  // routes here are the candidate-viewer ones (see App.tsx — a recruiter
+  // viewer would need /recruiter/candidates/:id and
+  // /recruiter/recruiters/:id instead, but this search bar isn't rendered
+  // there).
+  function goToPerson(person: PersonSearchResult) {
     setOpen(false);
-    navigate(`/candidates/${candidateId}/preview`);
+    navigate(
+      person.kind === "candidate"
+        ? `/candidates/${person.candidateId}/preview`
+        : `/recruiters/${person.recruiterId}`,
+    );
   }
 
   function goToJob(jobId: string) {
@@ -167,43 +176,59 @@ export default function GlobalSearchBar() {
               {people.length === 0 ? (
                 <p className="px-4 pb-3 text-sm text-ink-faint">No matching people</p>
               ) : (
-                people.map((person) => (
-                  <button
-                    key={person.candidateId}
-                    type="button"
-                    onClick={() => goToCandidate(person.candidateId)}
-                    className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-accent-soft"
-                  >
-                    {person.avatarUrl ? (
-                      <img
-                        src={person.avatarUrl}
-                        alt=""
-                        className="h-9 w-9 shrink-0 rounded-full border border-border object-cover"
-                      />
-                    ) : (
-                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink text-xs font-semibold text-white">
-                        {getInitials(person.fullName)}
-                      </span>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-ink">
-                        {person.fullName || "Candidate"}
-                      </p>
-                      <div className="flex flex-wrap items-center gap-x-2 text-xs text-ink-faint">
-                        {person.headline && <span className="truncate">{person.headline}</span>}
-                        {person.location && (
-                          <span className="inline-flex items-center gap-0.5">
-                            <MapPin className="h-3 w-3" strokeWidth={2} />
-                            {person.location}
-                          </span>
-                        )}
+                people.map((person) => {
+                  const isRecruiter = person.kind === "recruiter";
+                  const name = isRecruiter ? person.companyName : person.fullName;
+                  const imageUrl = isRecruiter ? person.companyLogoUrl : person.avatarUrl;
+                  const subtitle = isRecruiter ? person.jobTitle : person.headline;
+                  const location = isRecruiter ? person.companyLocation : person.location;
+                  const key = isRecruiter ? person.recruiterId : person.candidateId;
+
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => goToPerson(person)}
+                      className="flex w-full items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-accent-soft"
+                    >
+                      {imageUrl ? (
+                        <img
+                          src={imageUrl}
+                          alt=""
+                          className="h-9 w-9 shrink-0 rounded-full border border-border object-cover"
+                        />
+                      ) : (
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ink text-xs font-semibold text-white">
+                          {getInitials(name)}
+                        </span>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <p className="truncate text-sm font-medium text-ink">
+                            {name || (isRecruiter ? "Company" : "Candidate")}
+                          </p>
+                          {isRecruiter && (
+                            <span className="shrink-0 rounded-full bg-accent-soft px-1.5 py-0.5 text-[10px] font-medium text-accent-dark">
+                              Recruiter
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-x-2 text-xs text-ink-faint">
+                          {subtitle && <span className="truncate">{subtitle}</span>}
+                          {location && (
+                            <span className="inline-flex items-center gap-0.5">
+                              <MapPin className="h-3 w-3" strokeWidth={2} />
+                              {location}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                    <span className="shrink-0 text-xs font-medium text-accent-dark">
-                      View Profile
-                    </span>
-                  </button>
-                ))
+                      <span className="shrink-0 text-xs font-medium text-accent-dark">
+                        View Profile
+                      </span>
+                    </button>
+                  );
+                })
               )}
 
               <div className="border-t border-border px-4 pt-3 pb-2">

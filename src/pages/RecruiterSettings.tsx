@@ -4,6 +4,7 @@ import { LogOut } from "lucide-react";
 import { useAuth } from "../auth/useAuth";
 import { useRecruiterProfile } from "../recruiter/useRecruiterProfile";
 import { updateRecruiterProfile } from "../recruiter/recruiterStore";
+import PasswordInput from "../components/auth/PasswordInput";
 
 const inputClasses =
   "w-full rounded-lg border border-border bg-canvas px-3.5 py-2.5 text-sm text-ink placeholder:text-ink-faint transition-colors focus:border-accent focus:outline-none";
@@ -189,12 +190,12 @@ export default function RecruiterSettings() {
                 <span className="text-xs font-medium tracking-wide text-ink-faint uppercase">
                   New password
                 </span>
-                <input
-                  type="password"
+                <PasswordInput
+                  id="recruiter-new-password"
                   required
                   minLength={6}
                   autoComplete="new-password"
-                  className={`mt-1.5 ${inputClasses}`}
+                  className="mt-1.5"
                   placeholder="••••••••"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
@@ -204,11 +205,11 @@ export default function RecruiterSettings() {
                 <span className="text-xs font-medium tracking-wide text-ink-faint uppercase">
                   Confirm new password
                 </span>
-                <input
-                  type="password"
+                <PasswordInput
+                  id="recruiter-confirm-new-password"
                   required
                   autoComplete="new-password"
-                  className={`mt-1.5 ${inputClasses}`}
+                  className="mt-1.5"
                   placeholder="••••••••"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}

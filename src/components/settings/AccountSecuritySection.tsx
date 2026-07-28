@@ -1,8 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { LogOut, Trash2 } from "lucide-react";
-
-const inputClasses =
-  "w-full rounded-lg border border-border bg-canvas px-3.5 py-2.5 text-sm text-ink placeholder:text-ink-faint transition-colors focus:border-accent focus:outline-none";
+import PasswordInput from "../auth/PasswordInput";
 
 type Status = "idle" | "saving" | "error";
 
@@ -85,12 +83,12 @@ export default function AccountSecuritySection({
           <span className="text-xs font-medium tracking-wide text-ink-faint uppercase">
             New password
           </span>
-          <input
-            type="password"
+          <PasswordInput
+            id="candidate-new-password"
             required
             minLength={6}
             autoComplete="new-password"
-            className={`mt-1.5 ${inputClasses}`}
+            className="mt-1.5"
             placeholder="••••••••"
             value={newPassword}
             onChange={(e) => {
@@ -103,11 +101,11 @@ export default function AccountSecuritySection({
           <span className="text-xs font-medium tracking-wide text-ink-faint uppercase">
             Confirm new password
           </span>
-          <input
-            type="password"
+          <PasswordInput
+            id="candidate-confirm-new-password"
             required
             autoComplete="new-password"
-            className={`mt-1.5 ${inputClasses}`}
+            className="mt-1.5"
             placeholder="••••••••"
             value={confirmPassword}
             onChange={(e) => {

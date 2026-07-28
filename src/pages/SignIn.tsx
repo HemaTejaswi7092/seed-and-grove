@@ -6,6 +6,7 @@ import { getAuthErrorMessage } from "../auth/authErrors";
 import { resolvePostLoginPath } from "../auth/postLoginRedirect";
 import AuthHeader from "../components/auth/AuthHeader";
 import RoleSwitchLink from "../components/auth/RoleSwitchLink";
+import PasswordInput from "../components/auth/PasswordInput";
 
 const inputClasses =
   "w-full rounded-lg border border-border bg-canvas px-3.5 py-2.5 text-sm text-ink placeholder:text-ink-faint transition-colors focus:border-accent focus:outline-none";
@@ -117,14 +118,14 @@ export default function SignIn({ accountType = "candidate" }: SignInProps) {
                 >
                   Password
                 </label>
-                <input
+                <PasswordInput
                   id="signin-password"
-                  type="password"
                   required
+                  autoComplete="current-password"
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   placeholder="••••••••"
-                  className={`mt-2 ${inputClasses}`}
+                  className="mt-2"
                 />
               </div>
 

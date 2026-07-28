@@ -1,0 +1,39 @@
+-- Seed & Grove: OPTIONAL — delete test Supabase Auth accounts.
+--
+-- ============================================================================
+-- DO NOT RUN THIS. This is a separate, opt-in file on purpose — it is NOT
+-- part of cleanup_test_data.sql and should stay that way. Only run any of
+-- this after you've explicitly decided which specific accounts to remove.
+-- ============================================================================
+--
+-- This project currently has 7 auth.users. Deleting an auth.users row
+-- CASCADES and deletes every row that account owns across ALL 8 tables
+-- cleanup_test_data.sql covers (every one of them has its own
+-- ON DELETE CASCADE straight to auth.users(id) — confirmed via
+-- pg_constraint) — so running the main cleanup script first is usually
+-- unnecessary if you're going to delete the account anyway.
+--
+-- auth.users cannot be safely deleted with a plain SQL DELETE — Supabase
+-- Auth keeps its own related tables (identities, sessions, refresh_tokens,
+-- mfa factors, etc.) that a raw `delete from auth.users` will not clean up
+-- consistently. Use one of these instead:
+--
+-- Option A — Supabase Dashboard (simplest, recommended):
+--   Authentication -> Users -> select the test account(s) -> Delete user.
+--
+-- Option B — Management API / supabase-js admin client, per user:
+--   supabase.auth.admin.deleteUser(userId)
+--   (requires the service_role key — never the anon key — and should be run
+--   from a trusted server context, never the browser).
+--
+-- Option C — CLI, per user, once you have the exact user id(s):
+--   supabase db query --linked "select id, email from auth.users order by created_at;"
+--   -- then, only for the specific id(s) you've confirmed you want gone:
+--   -- (still goes through the Admin API under the hood via the dashboard/
+--   -- script above — there is no supported `supabase auth delete-user`
+--   -- CLI subcommand as of this project's CLI version)
+--
+-- If/when you do confirm specific accounts to remove, list them here first
+-- for your own review before acting on them anywhere:
+--
+-- select id, email, created_at from auth.users order by created_at;

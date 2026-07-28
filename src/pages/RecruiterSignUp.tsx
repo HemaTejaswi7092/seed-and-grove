@@ -6,6 +6,7 @@ import { useAuth } from "../auth/useAuth";
 import { getAuthErrorMessage } from "../auth/authErrors";
 import AuthHeader from "../components/auth/AuthHeader";
 import RoleSwitchLink from "../components/auth/RoleSwitchLink";
+import PasswordInput from "../components/auth/PasswordInput";
 import { useRecruiterProfile } from "../recruiter/useRecruiterProfile";
 import { createRecruiterProfile, updateRecruiterProfile } from "../recruiter/recruiterStore";
 import { parseCommaList } from "../recruiter/parseCommaList";
@@ -264,29 +265,29 @@ export default function RecruiterSignUp() {
                       <label htmlFor="rs-password" className="block text-sm font-medium text-ink">
                         Password
                       </label>
-                      <input
+                      <PasswordInput
                         id="rs-password"
-                        type="password"
                         required
                         minLength={6}
+                        autoComplete="new-password"
                         value={password}
                         onChange={(event) => setPassword(event.target.value)}
                         placeholder="••••••••"
-                        className={`mt-2 ${inputClasses}`}
+                        className="mt-2"
                       />
                     </div>
                     <div>
                       <label htmlFor="rs-confirm" className="block text-sm font-medium text-ink">
                         Confirm password
                       </label>
-                      <input
+                      <PasswordInput
                         id="rs-confirm"
-                        type="password"
                         required
+                        autoComplete="new-password"
                         value={confirmPassword}
                         onChange={(event) => setConfirmPassword(event.target.value)}
                         placeholder="••••••••"
-                        className={`mt-2 ${inputClasses}`}
+                        className="mt-2"
                       />
                     </div>
                     {error && (

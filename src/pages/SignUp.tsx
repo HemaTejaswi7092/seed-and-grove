@@ -6,6 +6,7 @@ import { useAuth } from "../auth/useAuth";
 import { getAuthErrorMessage } from "../auth/authErrors";
 import AuthHeader from "../components/auth/AuthHeader";
 import RoleSwitchLink from "../components/auth/RoleSwitchLink";
+import PasswordInput from "../components/auth/PasswordInput";
 
 const inputClasses =
   "w-full rounded-lg border border-border bg-canvas px-3.5 py-2.5 text-sm text-ink placeholder:text-ink-faint transition-colors focus:border-accent focus:outline-none";
@@ -143,15 +144,15 @@ export default function SignUp() {
                     >
                       Password
                     </label>
-                    <input
+                    <PasswordInput
                       id="signup-password"
-                      type="password"
                       required
                       minLength={6}
+                      autoComplete="new-password"
                       value={password}
                       onChange={(event) => setPassword(event.target.value)}
                       placeholder="••••••••"
-                      className={`mt-2 ${inputClasses}`}
+                      className="mt-2"
                     />
                   </div>
 
@@ -162,16 +163,16 @@ export default function SignUp() {
                     >
                       Confirm password
                     </label>
-                    <input
+                    <PasswordInput
                       id="signup-confirm"
-                      type="password"
                       required
+                      autoComplete="new-password"
                       value={confirmPassword}
                       onChange={(event) =>
                         setConfirmPassword(event.target.value)
                       }
                       placeholder="••••••••"
-                      className={`mt-2 ${inputClasses}`}
+                      className="mt-2"
                     />
                   </div>
 
