@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { getInitials } from "../../lib/initials";
 import { useMenuDismissRef } from "../../lib/useMenuDismiss";
+import { shouldShowStatusLabel } from "../../lib/seedStatus";
 import type { WorkspaceTab } from "./tabs";
 import type { Seed } from "../../types/seed";
 import type { ProjectHeaderMetadataItem } from "../../types/mockData";
@@ -113,13 +114,15 @@ export default function ProjectHeader({
             <h1 className="truncate text-lg font-semibold tracking-tight text-ink">
               {seed.title}
             </h1>
-            <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent-dark">
-              <span className="relative flex h-1.5 w-1.5">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-75" />
-                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-accent" />
+            {shouldShowStatusLabel(seed.lifecycleStatus) && (
+              <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent-dark">
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-75" />
+                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-accent" />
+                </span>
+                {seed.status}
               </span>
-              {seed.status}
-            </span>
+            )}
             {isCompleted && (
               <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-ink px-2 py-0.5 text-xs font-medium text-white">
                 <Trophy className="h-3 w-3" strokeWidth={2.25} />

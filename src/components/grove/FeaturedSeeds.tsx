@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Sprout, ArrowUpRight, Sparkles } from "lucide-react";
 import { getInitials } from "../../lib/initials";
+import { shouldShowStatusLabel } from "../../lib/seedStatus";
 import ProjectDetailModal from "./ProjectDetailModal";
 import type { AchievementHighlight, FeaturedSeedCard } from "../../types/grove";
 
@@ -101,12 +102,19 @@ export default function FeaturedSeeds({
                         {seed.title}
                       </p>
                       <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
-                        <span className="inline-block rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent-dark">
-                          {seed.status}
-                        </span>
+                        {shouldShowStatusLabel(seed.lifecycleStatus) && (
+                          <span className="inline-block rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent-dark">
+                            {seed.status}
+                          </span>
+                        )}
                         {seed.lifecycleStatus === "completed" && (
                           <span className="inline-block rounded-full bg-ink px-2 py-0.5 text-[11px] font-medium text-white">
                             Completed
+                          </span>
+                        )}
+                        {seed.lifecycleStatus === "archived" && (
+                          <span className="inline-block rounded-full bg-border px-2 py-0.5 text-[11px] font-medium text-ink-faint">
+                            Archived
                           </span>
                         )}
                         {isMatch && (

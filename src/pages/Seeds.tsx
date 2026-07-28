@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { Sprout, FolderGit2, Globe } from "lucide-react";
 import { useActiveProject } from "../auth/useActiveProject";
 import { getInitials } from "../lib/initials";
+import { shouldShowStatusLabel } from "../lib/seedStatus";
 import type { SeedSourceType } from "../types/seed";
 
 const sourceLabel: Record<SeedSourceType, string> = {
@@ -83,11 +84,12 @@ export default function Seeds() {
                         Archived
                       </span>
                     )}
-                    {seed.id === activeSeed?.id && (
-                      <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent-dark">
-                        {seed.status}
-                      </span>
-                    )}
+                    {seed.id === activeSeed?.id &&
+                      shouldShowStatusLabel(seed.lifecycleStatus) && (
+                        <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent-dark">
+                          {seed.status}
+                        </span>
+                      )}
                   </div>
                 </div>
                 <p className="mt-3 text-sm font-semibold text-ink">

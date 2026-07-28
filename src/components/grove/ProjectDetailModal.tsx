@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Award, Code2, ExternalLink, Trophy, X } from "lucide-react";
 import { getInitials } from "../../lib/initials";
+import { shouldShowStatusLabel } from "../../lib/seedStatus";
 import AchievementCard from "./AchievementCard";
 import type { AchievementHighlight, FeaturedSeedCard } from "../../types/grove";
 
@@ -53,13 +54,20 @@ export default function ProjectDetailModal({
             <div>
               <h2 className="text-lg font-semibold text-ink">{project.title}</h2>
               <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
-                <span className="inline-block rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent-dark">
-                  {project.status}
-                </span>
+                {shouldShowStatusLabel(project.lifecycleStatus) && (
+                  <span className="inline-block rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent-dark">
+                    {project.status}
+                  </span>
+                )}
                 {project.lifecycleStatus === "completed" && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-ink px-2 py-0.5 text-[11px] font-medium text-white">
                     <Trophy className="h-3 w-3" strokeWidth={2.25} />
                     Completed
+                  </span>
+                )}
+                {project.lifecycleStatus === "archived" && (
+                  <span className="inline-block rounded-full bg-border px-2 py-0.5 text-[11px] font-medium text-ink-faint">
+                    Archived
                   </span>
                 )}
               </div>
