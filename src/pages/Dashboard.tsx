@@ -224,7 +224,7 @@ export default function Dashboard() {
 
       <div className="order-1 lg:order-2">
         <div className="mb-6">
-          <GlobalSearchBar />
+          <GlobalSearchBar viewerAccountType="candidate" />
         </div>
 
         <div className="mb-6">

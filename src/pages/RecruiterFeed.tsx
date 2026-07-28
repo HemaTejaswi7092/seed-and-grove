@@ -8,6 +8,7 @@ import {
 } from "../state/feedStore";
 import { rankFeed } from "../lib/rankFeed";
 import FeedPostCard from "../components/dashboard/FeedPostCard";
+import GlobalSearchBar from "../components/dashboard/GlobalSearchBar";
 import type { FeedPost } from "../types/feed";
 
 // The recruiter-side counterpart to pages/Dashboard.tsx's feed — same
@@ -81,6 +82,10 @@ export default function RecruiterFeed() {
         Candidate milestones and achievements, alongside company posts from
         recruiters across Seed &amp; Grove.
       </p>
+
+      <div className="mt-6">
+        <GlobalSearchBar viewerAccountType="recruiter" />
+      </div>
 
       <div className="mt-6">
         {error && (

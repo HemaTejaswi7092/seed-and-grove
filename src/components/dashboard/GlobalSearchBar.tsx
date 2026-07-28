@@ -25,12 +25,24 @@ const EMPLOYMENT_TYPE_LABEL: Record<EmploymentType, string> = {
 
 type SearchStatus = "idle" | "loading" | "error";
 
+interface GlobalSearchBarProps {
+  // Rendered on both the candidate Dashboard and the recruiter Feed (see
+  // Dashboard.tsx / RecruiterFeed.tsx) — searchPeople()/searchJobs()
+  // themselves are already viewer-agnostic (same query regardless of who's
+  // asking), but the *destination* routes differ per viewer, same reason
+  // FeedPostCard needs this: candidates and recruiters each have their own
+  // route to view a candidate profile, a recruiter profile, and a job
+  // (see App.tsx), so the wrong one would bounce the viewer off their own
+  // gated layout.
+  viewerAccountType: "candidate" | "recruiter";
+}
+
 // Two safe, already-scoped surfaces only (see state/searchStore.ts's
 // header comment) — never Seed data, private Achievements, or
 // copilot_memory, none of which this component has any code path to.
 // Debounced client-side: a keystroke only schedules a search, an actual
 // query only fires once the input's been quiet for DEBOUNCE_MS.
-export default function GlobalSearchBar() {
+export default function GlobalSearchBar({ viewerAccountType }: GlobalSearchBarProps) {
   const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -98,23 +110,27 @@ export default function GlobalSearchBar() {
     setOpen(false);
   }
 
-  // This component only ever renders on the candidate Dashboard, so both
-  // routes here are the candidate-viewer ones (see App.tsx — a recruiter
-  // viewer would need /recruiter/candidates/:id and
-  // /recruiter/recruiters/:id instead, but this search bar isn't rendered
-  // there).
   function goToPerson(person: PersonSearchResult) {
     setOpen(false);
-    navigate(
-      person.kind === "candidate"
-        ? `/candidates/${person.candidateId}/preview`
-        : `/recruiters/${person.recruiterId}`,
-    );
+    const isRecruiterViewer = viewerAccountType === "recruiter";
+    if (person.kind === "candidate") {
+      navigate(
+        isRecruiterViewer
+          ? `/recruiter/candidates/${person.candidateId}`
+          : `/candidates/${person.candidateId}/preview`,
+      );
+    } else {
+      navigate(
+        isRecruiterViewer
+          ? `/recruiter/recruiters/${person.recruiterId}`
+          : `/recruiters/${person.recruiterId}`,
+      );
+    }
   }
 
   function goToJob(jobId: string) {
     setOpen(false);
-    navigate(`/opportunities/${jobId}`);
+    navigate(viewerAccountType === "recruiter" ? `/recruiter/opportunities/${jobId}` : `/opportunities/${jobId}`);
   }
 
   const hasQuery = debouncedQuery.length > 0;
@@ -135,7 +151,7 @@ export default function GlobalSearchBar() {
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
-          placeholder="Search candidates or job titles…"
+          placeholder="Search people or job titles…"
           className="w-full rounded-full border border-border bg-canvas-elevated py-3 pr-10 pl-11 text-sm text-ink placeholder:text-ink-faint transition-colors focus:border-accent focus:outline-none"
         />
         {query && (
