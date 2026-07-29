@@ -1,4 +1,5 @@
 import { supabase } from "../lib/supabase";
+import { postGroveProfileUpdated } from "./feedActivity";
 import type {
   CandidateProfilePublic,
   CandidateProfileRow,
@@ -139,11 +140,35 @@ export async function saveCandidateProfile(
 // so any section not being saved right now is left completely untouched —
 // this is what makes "save each section independently" safe without a
 // full round-trip of every field on every save.
+// Posts a Community Feed "updated their Grove profile" activity, but only
+// when this save actually touches headline or bio (professional summary)
+// — the two fields that define how a candidate presents themselves — and
+// only when the new value genuinely differs from what was already saved.
+// Without that diff, every section save (including saving unrelated
+// fields, or re-saving the same values) would spam the feed; this is what
+// keeps it to one real "profile updated" moment.
+async function maybePostGroveProfileUpdated(
+  userId: string,
+  fullName: string,
+  patch: Partial<Omit<CandidateProfileRow, "user_id" | "full_name" | "created_at" | "updated_at">>,
+): Promise<void> {
+  const touchesIdentityFields = "headline" in patch || "bio" in patch;
+  if (!touchesIdentityFields) return;
+
+  const before = await getCandidateProfile(userId);
+  const changed =
+    ("headline" in patch && patch.headline !== (before?.headline ?? "")) ||
+    ("bio" in patch && patch.bio !== (before?.bio ?? ""));
+  if (changed) await postGroveProfileUpdated(userId, fullName);
+}
+
 export async function updateCandidateProfileFields(
   userId: string,
   fullName: string,
   patch: Partial<Omit<CandidateProfileRow, "user_id" | "full_name" | "created_at" | "updated_at">>,
 ): Promise<CandidateProfileRow> {
+  await maybePostGroveProfileUpdated(userId, fullName, patch);
+
   const { data, error } = await supabase
     .from("candidate_profiles")
     .upsert({ user_id: userId, full_name: fullName, ...patch })

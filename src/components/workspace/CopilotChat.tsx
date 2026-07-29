@@ -25,6 +25,11 @@ interface CopilotChatProps {
   // the parent page can re-read it and refresh the Achievements panel/
   // stats — this component has no reactive link to Seed.tsx otherwise.
   onDataCaptured?: () => void;
+  // Stamped on the Community Feed post if the Copilot's "Save as
+  // Achievement" flow saves it as published — see Seed.tsx's authorName.
+  // Falls back to a generic label rather than requiring every caller to
+  // resolve a display name just for this.
+  authorName?: string;
 }
 
 type SendStatus = "idle" | "sending" | "error";
@@ -108,6 +113,7 @@ export default function CopilotChat({
   achievements,
   persist,
   onDataCaptured,
+  authorName = "A builder",
 }: CopilotChatProps) {
   const [messages, setMessages] = useState<SeedConversationMessage[]>(
     initialMessages,
@@ -222,7 +228,7 @@ export default function CopilotChat({
 
   async function handleSaveAchievement(input: Parameters<typeof createAchievement>[2]) {
     if (!reviewMessageId || !userId) return;
-    await createAchievement(userId, seed.id, input);
+    await createAchievement(userId, seed.id, input, authorName);
     const messageId = reviewMessageId;
     setMessageExtras((prev) => ({
       ...prev,

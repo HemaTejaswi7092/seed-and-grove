@@ -5,6 +5,7 @@ import { useAuth } from "../auth/useAuth";
 import { getJob, createJob, updateJob } from "../recruiter/recruiterStore";
 import { parseCommaList } from "../recruiter/parseCommaList";
 import { generateJobDescription } from "../services/ai/generateRecruiterContent";
+import { getDisplayName } from "../lib/displayName";
 import type { EmploymentType, JobInput, JobStatus, WorkMode } from "../recruiter/types";
 
 const inputClasses =
@@ -40,7 +41,10 @@ export default function RecruiterJobForm() {
   const { jobId } = useParams<{ jobId?: string }>();
   const isEditMode = !!jobId;
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
+  // Stamped on the Community Feed post created when this job is
+  // published (see recruiter/recruiterStore.ts's createJob/updateJob).
+  const authorName = getDisplayName(user, profile) || "A recruiter";
 
   const [title, setTitle] = useState("");
   const [location, setLocation] = useState("");
@@ -151,9 +155,9 @@ export default function RecruiterJobForm() {
 
     try {
       if (isEditMode && jobId) {
-        await updateJob(jobId, input);
+        await updateJob(jobId, input, authorName);
       } else {
-        await createJob(user.id, input);
+        await createJob(user.id, input, authorName);
       }
       navigate("/recruiter/jobs");
     } catch (err) {

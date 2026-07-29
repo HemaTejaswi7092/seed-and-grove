@@ -16,6 +16,7 @@ import {
 } from "./seedStore";
 import {
   createSeed as createSeedRemote,
+  getSeed,
   updateSeed,
   deleteSeed as deleteSeedRemote,
   type UpdateSeedInput,
@@ -27,6 +28,7 @@ import {
 } from "./groveSeedsStore";
 import { deletePublishedAchievementsByProject } from "./groveAchievementsStore";
 import { deleteFeedPostsForSeed } from "./feedStore";
+import { postSeedPublished, postSeedCompleted } from "./feedActivity";
 import type { DraftSeedInput, Seed } from "../types/seed";
 
 function toPublishedInput(seed: Seed): UpsertPublishedSeedInput {
@@ -72,7 +74,14 @@ export async function setSeedPublishedAndSync(
   userId: string,
   seedId: string,
   isPublished: boolean,
+  authorName: string,
 ): Promise<Seed | null> {
+  // Read before writing so the Community Feed post below only fires on a
+  // genuine private→published transition, never on a second publish(true)
+  // call against an already-published Seed (see feedActivity.ts's header
+  // comment on why this matters for "no duplicate posts").
+  const before = await getSeed(userId, seedId);
+
   const now = new Date().toISOString();
   const updated = await updateSeed(userId, seedId, {
     is_published: isPublished,
@@ -85,6 +94,9 @@ export async function setSeedPublishedAndSync(
     // Only the private→published transition is Timeline-worthy —
     // unpublishing isn't in the recorded event list (see types/seed.ts).
     addTimelineEvent(userId, seedId, "project_published");
+    if (!before?.isPublished) {
+      await postSeedPublished(userId, authorName, updated);
+    }
   } else {
     await deletePublishedSeed(seedId);
   }
@@ -131,13 +143,24 @@ export async function updateSeedLinksAndSync(
 export async function completeSeedAndSync(
   userId: string,
   seedId: string,
+  authorName: string,
 ): Promise<Seed | null> {
+  // Same before/after guard as setSeedPublishedAndSync — only post when
+  // this call is the actual in_progress→completed transition, not a
+  // re-completion of an already-completed Seed.
+  const before = await getSeed(userId, seedId);
+
   const updated = await updateSeed(userId, seedId, {
     lifecycle_status: "completed",
     completed_at: new Date().toISOString(),
   });
   await syncIfPublished(updated);
-  if (updated) addTimelineEvent(userId, seedId, "project_completed");
+  if (updated) {
+    addTimelineEvent(userId, seedId, "project_completed");
+    if (updated.isPublished && before?.lifecycleStatus !== "completed") {
+      await postSeedCompleted(userId, authorName, updated);
+    }
+  }
   return updated;
 }
 

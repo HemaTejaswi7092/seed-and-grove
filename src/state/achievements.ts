@@ -19,6 +19,8 @@ import {
   upsertPublishedAchievement,
   type UpsertPublishedAchievementInput,
 } from "./groveAchievementsStore";
+import { getSeed } from "./seedsStore";
+import { postAchievementPublished } from "./feedActivity";
 import { buildAchievementEmbeddingText } from "../lib/achievementEmbeddingText";
 import { embedText } from "../services/ai/embedText";
 import type { Achievement } from "../types/seed";
@@ -67,6 +69,7 @@ export async function createAchievement(
   userId: string,
   seedId: string,
   input: CreateAchievementInput,
+  authorName = "A builder",
 ): Promise<Achievement> {
   const achievement = createSeedAchievement(userId, seedId, input);
   // "Milestone" is one specific achievementType among several (see
@@ -81,6 +84,16 @@ export async function createAchievement(
   if (achievement.visibility === "published") {
     await upsertPublishedAchievement(userId, await toPublishedInput(achievement));
     addTimelineEvent(userId, seedId, "achievement_published", achievement.title);
+    const seed = await getSeed(userId, seedId);
+    await postAchievementPublished(userId, authorName, {
+      id: achievement.id,
+      title: achievement.title,
+      shortDescription: achievement.shortDescription,
+      seedId,
+      projectTitle: seed?.title ?? achievement.projectDomain,
+      achievementType: achievement.achievementType,
+      skillsDemonstrated: achievement.skillsDemonstrated,
+    });
   }
   return achievement;
 }
@@ -94,6 +107,7 @@ export async function updateAchievement(
   userId: string,
   achievementId: string,
   patch: UpdateAchievementInput,
+  authorName = "A builder",
 ): Promise<Achievement | null> {
   const before = getAchievement(userId, achievementId);
   const updated = updateSeedAchievement(userId, achievementId, patch);
@@ -101,11 +115,23 @@ export async function updateAchievement(
 
   if (updated.visibility === "published") {
     await upsertPublishedAchievement(userId, await toPublishedInput(updated));
-    // Only the private→published transition is Timeline-worthy — every
-    // other edit (title, description, ...) is exactly the "minor edit"
-    // the Timeline spec says not to record.
+    // Only the private→published transition is Timeline-worthy (and
+    // Community Feed-worthy) — every other edit (title, description, ...)
+    // to an already-published achievement is exactly the "minor edit" the
+    // Timeline spec says not to record, and re-posting it would violate
+    // the "no duplicate posts" requirement.
     if (before && before.visibility !== "published") {
       addTimelineEvent(userId, updated.seedId, "achievement_published", updated.title);
+      const seed = await getSeed(userId, updated.seedId);
+      await postAchievementPublished(userId, authorName, {
+        id: updated.id,
+        title: updated.title,
+        shortDescription: updated.shortDescription,
+        seedId: updated.seedId,
+        projectTitle: seed?.title ?? updated.projectDomain,
+        achievementType: updated.achievementType,
+        skillsDemonstrated: updated.skillsDemonstrated,
+      });
     }
   } else {
     await deletePublishedAchievement(updated.id);

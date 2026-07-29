@@ -18,7 +18,11 @@ export type FeedPostType =
   | "hiring_announcement"
   | "team_achievement"
   | "industry_update"
-  | "company_news";
+  | "company_news"
+  // System-generated the moment a recruiter publishes a Job — distinct
+  // from the manually-composed Company Post types above. See
+  // feed_post_job_type.sql.
+  | "job_posted";
 
 export type FeedPostAuthorAccountType = "candidate" | "recruiter";
 

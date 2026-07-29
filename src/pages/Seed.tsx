@@ -169,6 +169,10 @@ export default function Seed() {
   // nested handlers below (closures aren't narrowed by the
   // `if (!user)` guard above on their own).
   const currentUser = user;
+  // The snapshot every automatic Community Feed post below is stamped
+  // with (publish, complete, achievement-publish) — same fallback
+  // handlePublishToFeed already used for the manual Share flow.
+  const authorName = getDisplayName(currentUser, profile) || "A builder";
 
   if (seed === undefined) {
     if (loadError) {
@@ -240,7 +244,12 @@ export default function Seed() {
   async function handleTogglePublish() {
     const nextPublished = !currentSeed.isPublished;
     try {
-      const updated = await setSeedPublishedAndSync(currentUser.id, currentSeed.id, nextPublished);
+      const updated = await setSeedPublishedAndSync(
+        currentUser.id,
+        currentSeed.id,
+        nextPublished,
+        authorName,
+      );
       applySeedUpdate(updated);
       showToast(nextPublished ? "Published to Grove" : "Made private");
     } catch (err) {
@@ -302,7 +311,7 @@ export default function Seed() {
     input: Parameters<typeof updateAchievement>[2],
   ) {
     if (!editingAchievement) return;
-    await updateAchievement(currentUser.id, editingAchievement.id, input);
+    await updateAchievement(currentUser.id, editingAchievement.id, input, authorName);
     setEditingAchievement(null);
     forceRefresh((n) => n + 1);
     showToast("Achievement updated");
@@ -315,7 +324,7 @@ export default function Seed() {
   async function handleSaveManualAchievement(
     input: Parameters<typeof createAchievement>[2],
   ) {
-    await createAchievement(currentUser.id, currentSeed.id, input);
+    await createAchievement(currentUser.id, currentSeed.id, input, authorName);
     setManualAchievementOpen(false);
     forceRefresh((n) => n + 1);
     showToast(
@@ -334,7 +343,7 @@ export default function Seed() {
   async function handleSaveCompletionAchievement(
     input: Parameters<typeof createAchievement>[2],
   ) {
-    await createAchievement(currentUser.id, currentSeed.id, input);
+    await createAchievement(currentUser.id, currentSeed.id, input, authorName);
     forceRefresh((n) => n + 1);
   }
 
@@ -387,7 +396,7 @@ export default function Seed() {
   // are still two separate writes; this one only ever runs after at
   // least one achievement already exists.
   async function handleCompleteFromWorkflow() {
-    const updated = await completeSeedAndSync(currentUser.id, currentSeed.id);
+    const updated = await completeSeedAndSync(currentUser.id, currentSeed.id, authorName);
     applySeedUpdate(updated);
     setCompletionWorkflowOpen(false);
     showToast("Project marked complete");
@@ -510,6 +519,7 @@ export default function Seed() {
                     achievements={rawAchievements}
                     persist={!isDemo}
                     onDataCaptured={() => forceRefresh((n) => n + 1)}
+                    authorName={authorName}
                   />
                 </div>
                 <div className="lg:col-span-2">

@@ -1,6 +1,7 @@
 import { supabase } from "../lib/supabase";
 import { buildJobEmbeddingText } from "../lib/jobEmbeddingText";
 import { embedText } from "../services/ai/embedText";
+import { postJobPosted } from "../state/feedActivity";
 import type {
   Job,
   JobInput,
@@ -119,9 +120,23 @@ export async function getJob(
   return (data as Job | null) ?? null;
 }
 
+// Best-effort Community Feed announcement for a Job that just became
+// (or already was) 'published' — looks up the recruiter's own company
+// name fresh rather than trusting a caller-supplied value, since that's
+// canonical recruiter_profiles data, not something JobInput carries.
+// Failure here (including a missing recruiter profile) never blocks the
+// job save itself — see feedActivity.ts's postBestEffort.
+async function announceJobPosted(recruiterId: string, authorName: string, job: Job): Promise<void> {
+  const profile = await getRecruiterProfile(recruiterId).catch(() => null);
+  await postJobPosted(recruiterId, authorName, profile?.company_name || "A company", {
+    title: job.title,
+  });
+}
+
 export async function createJob(
   recruiterId: string,
   input: JobInput,
+  authorName = "A recruiter",
 ): Promise<Job> {
   const payload = await withJobEmbedding(input);
   const { data, error } = await supabase
@@ -131,13 +146,24 @@ export async function createJob(
     .single();
 
   if (error) throw new Error(error.message);
-  return data as Job;
+  const job = data as Job;
+  if (job.status === "published") {
+    await announceJobPosted(recruiterId, authorName, job);
+  }
+  return job;
 }
 
 export async function updateJob(
   jobId: string,
   input: Partial<JobInput>,
+  authorName = "A recruiter",
 ): Promise<Job> {
+  // Read before writing so the Community Feed post only fires on the
+  // actual draft→published transition, never on a later edit to a Job
+  // that was already published (see feedActivity.ts's header comment on
+  // why this matters for "no duplicate posts").
+  const before = input.status === "published" ? await getJobById(jobId) : null;
+
   const payload = await withJobEmbedding(input);
   const { data, error } = await supabase
     .from("jobs")
@@ -147,7 +173,21 @@ export async function updateJob(
     .single();
 
   if (error) throw new Error(error.message);
-  return data as Job;
+  const job = data as Job;
+  if (job.status === "published" && before?.status !== "published") {
+    await announceJobPosted(job.recruiter_id, authorName, job);
+  }
+  return job;
+}
+
+// Unscoped-by-recruiter read used only for the before/after status check
+// above — RLS still restricts this to the caller's own row (a draft Job
+// isn't in the public "status = published" read policy), so this can
+// never leak another recruiter's unpublished Job.
+async function getJobById(jobId: string): Promise<Job | null> {
+  const { data, error } = await supabase.from("jobs").select("*").eq("id", jobId).maybeSingle();
+  if (error) throw new Error(error.message);
+  return (data as Job | null) ?? null;
 }
 
 // "Archive" — a UI action, not a distinct status. See types.ts's JobStatus.
