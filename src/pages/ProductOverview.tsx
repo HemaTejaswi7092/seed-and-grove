@@ -14,8 +14,16 @@ import {
   Compass,
   ShieldCheck,
   Printer,
+  ExternalLink,
 } from "lucide-react";
 import "./ProductOverview.css";
+
+// The deployed prototype — sourced from this repo's own README ("Live
+// Demo" link), not guessed. Printed as visible text (see the footer CTA
+// below) specifically so the URL survives export to a physical/PDF page
+// where the <a> itself obviously isn't clickable.
+const LIVE_DEMO_URL = "https://seed-and-grove.vercel.app";
+const LIVE_DEMO_DISPLAY = "seed-and-grove.vercel.app";
 
 // Standalone, print-optimized one-page product brief for the AI Fellowship
 // submission — a real physical document (US Letter, one page), not a
@@ -451,13 +459,34 @@ export default function ProductOverview() {
               ))}
             </ul>
           </div>
-          <div className="flex h-full flex-col items-end justify-end">
-            <p className="text-[11px] font-bold tracking-tight text-ink">
-              Seed &amp; Grove
-            </p>
-            <p className="text-[8px] font-medium text-accent-dark">
-              Build it. Prove it. Grow it.
-            </p>
+          <div className="flex h-full flex-col items-end justify-end gap-[0.06in]">
+            <div className="text-right">
+              <p className="text-[7.5px] font-bold tracking-wide text-ink-faint uppercase">
+                Explore the Working Prototype
+              </p>
+              <a
+                href={LIVE_DEMO_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-[0.03in] inline-flex items-center gap-1 rounded-full bg-accent px-2.5 py-[0.03in] text-[9px] font-semibold text-white shadow-sm shadow-accent/20"
+              >
+                <ExternalLink className="h-[9px] w-[9px]" strokeWidth={2.5} />
+                Open Live Demo
+              </a>
+              {/* Plain text, not just the link — this is what remains
+                  usable once the page is printed or exported to PDF. */}
+              <p className="mt-[0.025in] text-[7px] text-ink-faint">
+                {LIVE_DEMO_DISPLAY}
+              </p>
+            </div>
+            <div>
+              <p className="text-[11px] font-bold tracking-tight text-ink">
+                Seed &amp; Grove
+              </p>
+              <p className="text-[8px] font-medium text-accent-dark">
+                Build it. Prove it. Grow it.
+              </p>
+            </div>
           </div>
         </div>
       </div>
